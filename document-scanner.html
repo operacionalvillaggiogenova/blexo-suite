@@ -32,7 +32,7 @@
 
     <section class="card scanner-card">
       <div class="section-title"><span class="step">2</span><h2>Páginas do documento</h2><span id="pageCount" class="count">0 páginas</span></div>
-      <p class="hint">A câmera traseira é priorizada no celular. O sistema tenta localizar os quatro cantos da folha e corrigir a perspectiva automaticamente.</p>
+      <p class="hint">A câmera traseira é priorizada no celular. Após fotografar, ajuste os quatro cantos da folha e o sistema corrige a perspectiva antes de salvar a página.</p>
       <div class="capture-actions scanner-actions">
         <label class="capture-button primary"><input id="cameraInput" type="file" accept="image/*" capture="environment">⌾ Fotografar página</label>
         <label class="capture-button"><input id="galleryInput" type="file" accept="image/*" multiple>▧ Escolher fotos</label>
@@ -61,6 +61,15 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <dialog id="scanReview" class="scan-review">
+    <div class="scan-review-shell">
+      <div class="review-head"><h2>Ajustar página</h2><button id="closeReview" class="review-close" type="button" aria-label="Fechar">×</button></div>
+      <p class="review-hint">Arraste os quatro pontos para os cantos exatos da folha. A imagem será corrigida para uma página A4 antes de ser adicionada ao documento.</p>
+      <div class="review-canvas-wrap"><canvas id="reviewCanvas" class="review-canvas"></canvas></div>
+      <p id="reviewStatus" class="review-status"></p>
+      <div class="review-actions"><button id="cancelScan" class="review-cancel" type="button">Cancelar</button><button id="confirmScan" class="review-confirm" type="button">Corrigir e adicionar</button></div>
+    </div>
+  </dialog>
   <script src="document-scanner.js"></script>
 </body>
 </html>
