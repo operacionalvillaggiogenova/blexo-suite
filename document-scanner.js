@@ -1,0 +1,73 @@
+const $ = id => document.getElementById(id);
+const DB_NAME = 'blexo-check-documents-v2';
+const STORE = 'documents';
+let currentDocument = blankDocument();
+let saveTimer;
+let cvPromise;
+
+const newId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+const blankDocument = () => ({
+  id: newId(), name: 'Novo documento', company: '', reference: '', responsible: '', notes: '',
+  mode: 'gray', cleanLevel: 55, pages: [], updatedAt: new Date().toISOString()
+});
+
+function openDatabase(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>request.result.createObjectStore(STORE,{keyPath:'id'});request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+async function saveDocument(){const db=await openDatabase();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(currentDocument);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
+async function getDocuments(){const db=await openDatabase();return new Promise((resolve,reject)=>{const req=db.transaction(STORE).objectStore(STORE).getAll();req.onsuccess=()=>{db.close();resolve(req.result||[])};req.onerror=()=>{db.close();reject(req.error)}})}
+function scheduleSave(message='Salvo neste aparelho'){clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{syncFields();currentDocument.updatedAt=new Date().toISOString();await saveDocument();$('feedback').textContent=message},350)}
+function syncFields(){currentDocument.name=$('documentName').value.trim();currentDocument.company=$('company').value.trim();currentDocument.reference=$('reference').value.trim();currentDocument.responsible=$('responsible').value.trim();currentDocument.notes=$('notes').value.trim();currentDocument.mode=document.querySelector('input[name="scanMode"]:checked')?.value||'gray';currentDocument.cleanLevel=Number($('cleanLevel').value);$('documentHeading').textContent=currentDocument.name||'Novo documento'}
+function render(){ $('documentName').value=currentDocument.name||'';$('company').value=currentDocument.company||'';$('reference').value=currentDocument.reference||'';$('responsible').value=currentDocument.responsible||'';$('notes').value=currentDocument.notes||'';document.querySelector(`input[name="scanMode"][value="${currentDocument.mode||'gray'}"]`).checked=true;$('cleanLevel').value=Number.isFinite(currentDocument.cleanLevel)?currentDocument.cleanLevel:55;updateCleanLabel();$('documentHeading').textContent=currentDocument.name||'Novo documento';renderPages() }
+function escapeHtml(value=''){return String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function renderPages(){const pages=currentDocument.pages;$('pageCount').textContent=`${pages.length} ${pages.length===1?'página':'páginas'}`;$('generateButton').disabled=!pages.length;if(!pages.length){$('pagesList').innerHTML='<div class="empty-pages">Nenhuma página adicionada. Use “Fotografar página” ou escolha imagens da galeria.</div>';return}$('pagesList').innerHTML=pages.map((page,index)=>`<article class="document-page"><button class="page-remove" data-remove-page="${page.id}" aria-label="Excluir página">×</button><img src="${page.src}" alt="Página ${index+1}"><div class="page-number">Página ${String(index+1).padStart(2,'0')}</div><div class="page-mode">${page.mode==='document'?'Documento':page.mode==='gray'?'Tons de cinza':'Original'}${page.corrected?' · perspectiva corrigida':''}</div>${page.warning?`<div class="page-warning">${escapeHtml(page.warning)}</div>`:''}<input class="page-title" data-page-title="${page.id}" value="${escapeHtml(page.title||'')}" placeholder="Identificação da página (opcional)"></article>`).join('');document.querySelectorAll('[data-remove-page]').forEach(b=>b.onclick=()=>{currentDocument.pages=currentDocument.pages.filter(p=>p.id!==b.dataset.removePage);renderPages();scheduleSave()});document.querySelectorAll('[data-page-title]').forEach(f=>f.oninput=()=>{const p=currentDocument.pages.find(x=>x.id===f.dataset.pageTitle);if(p)p.title=f.value;scheduleSave()})}
+
+function loadOpenCV(){
+  if(window.cv && typeof window.cv.Mat==='function') return Promise.resolve(window.cv);
+  if(cvPromise) return cvPromise;
+  cvPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src='https://docs.opencv.org/4.x/opencv.js';script.async=true;
+    script.onload=()=>{const ready=()=>{if(window.cv&&typeof window.cv.Mat==='function'){resolve(window.cv)}else setTimeout(ready,50)};ready()};script.onerror=()=>reject(new Error('Não foi possível carregar o OpenCV.js.'));document.head.appendChild(script);
+  });
+  return cvPromise;
+}
+async function ensureCV(){try{const cv=await loadOpenCV();$('opencvStatus').textContent='Processamento pronto';return cv}catch(e){$('opencvStatus').textContent='Processamento avançado indisponível offline';throw e}}
+
+function readImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(reader.error);reader.onload=()=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=reader.result};reader.readAsDataURL(file)})}
+function imageToCanvas(img,maxSide=2400){const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);return canvas}
+function canvasData(canvas,quality=.84){return canvas.toDataURL('image/jpeg',quality)}
+function orderPoints(points){const sums=points.map(p=>p.x+p.y), diffs=points.map(p=>p.x-p.y);return [points[sums.indexOf(Math.min(...sums))],points[diffs.indexOf(Math.max(...diffs))],points[sums.indexOf(Math.max(...sums))],points[diffs.indexOf(Math.min(...diffs))]]}
+function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function detectDocument(cv,srcCanvas){
+  const src=cv.imread(srcCanvas), work=new cv.Mat(), gray=new cv.Mat(), blur=new cv.Mat(), edges=new cv.Mat(), contours=new cv.MatVector(), hierarchy=new cv.Mat();
+  try{
+    cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY,0);cv.GaussianBlur(gray,blur,new cv.Size(5,5),0,0,cv.BORDER_DEFAULT);cv.Canny(blur,edges,60,180);cv.findContours(edges,contours,hierarchy,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
+    const imageArea=src.cols*src.rows;let best=null,bestArea=0;
+    for(let i=0;i<contours.size();i++){const c=contours.get(i), area=Math.abs(cv.contourArea(c));if(area<imageArea*.18){c.delete();continue}const peri=cv.arcLength(c,true), approx=new cv.Mat();cv.approxPolyDP(c,approx,.025*peri,true);if(approx.rows===4&&area>bestArea){const pts=[];for(let j=0;j<4;j++)pts.push({x:approx.intPtr(j,0)[0],y:approx.intPtr(j,0)[1]});best=pts;bestArea=area}approx.delete();c.delete()}
+    return best;
+  }finally{src.delete();work.delete();gray.delete();blur.delete();edges.delete();contours.delete();hierarchy.delete()}
+}
+function warpDocument(cv,srcCanvas,points){
+  const ordered=orderPoints(points), [tl,tr,br,bl]=ordered;const width=Math.max(distance(tl,tr),distance(bl,br)),height=Math.max(distance(tl,bl),distance(tr,br));const aspect=width/height;const portrait=aspect<1.25;const outH=portrait?1700:1200,outW=portrait?1200:1700;
+  const src=cv.imread(srcCanvas), dst=new cv.Mat(), srcTri=cv.matFromArray(4,1,cv.CV_32FC2,[tl.x,tl.y,tr.x,tr.y,br.x,br.y,bl.x,bl.y]), dstTri=cv.matFromArray(4,1,cv.CV_32FC2,[0,0,outW-1,0,outW-1,outH-1,0,outH-1]);
+  try{const M=cv.getPerspectiveTransform(srcTri,dstTri);cv.warpPerspective(src,dst,M,new cv.Size(outW,outH),cv.INTER_CUBIC,cv.BORDER_CONSTANT,new cv.Scalar(255,255,255,255));const canvas=document.createElement('canvas');canvas.width=outW;canvas.height=outH;cv.imshow(canvas,dst);M.delete();return canvas}finally{src.delete();dst.delete();srcTri.delete();dstTri.delete()}
+}
+function cleanCanvas(cv,canvas,mode,level){
+  if(mode==='original')return canvas;
+  const src=cv.imread(canvas), gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
+  try{
+    if(mode==='gray'){const den=new cv.Mat();cv.GaussianBlur(gray,den,new cv.Size(3,3),0);const out=new cv.Mat();cv.addWeighted(gray,1.18,den,-.18,0,out);const result=document.createElement('canvas');result.width=out.cols;result.height=out.rows;cv.imshow(result,out);out.delete();den.delete();return result}
+    const blur=new cv.Mat(), normalized=new cv.Mat(), binary=new cv.Mat();const k=level>=70?31:level>=40?21:11;cv.GaussianBlur(gray,blur,new cv.Size(k|1,k|1),0);cv.adaptiveThreshold(gray,normalized,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY,k|1,Math.max(3,Math.round(5+level*.08)));const kernel=cv.Mat.ones(2,2,cv.CV_8U);cv.morphologyEx(normalized,binary,cv.MORPH_OPEN,kernel);kernel.delete();const result=document.createElement('canvas');result.width=binary.cols;result.height=binary.rows;cv.imshow(result,binary);blur.delete();normalized.delete();binary.delete();return result;
+  }finally{src.delete();gray.delete()}
+}
+async function processFile(file){const img=await readImage(file);const base=imageToCanvas(img,2400);let cv=null,corrected=false,warning='';try{cv=await ensureCV();const points=detectDocument(cv,base);if(points){const area=Math.abs((points[0].x*points[1].y+points[1].x*points[2].y+points[2].x*points[3].y+points[3].x*points[0].y-(points[1].x*points[0].y+points[2].x*points[1].y+points[3].x*points[2].y+points[0].x*points[3].y))/2);if(area/(base.width*base.height)>.28){base=warpDocument(cv,base,points);corrected=true}else warning='Folha detectada com baixa confiança; revise a imagem.'}else warning='Não foi possível detectar a folha; a foto original foi mantida.';base=cleanCanvas(cv,base,currentDocument.mode,Number(currentDocument.cleanLevel))}catch(error){console.warn(error);warning='Processamento avançado indisponível; a imagem foi apenas ajustada ao tamanho.'}return {src:canvasData(base,.84),title:'',mode:currentDocument.mode,corrected,warning}}
+
+async function addFiles(fileList){const files=[...fileList].filter(f=>f.type.startsWith('image/'));if(!files.length)return;syncFields();$('feedback').textContent=`Processando ${files.length} ${files.length===1?'imagem':'imagens'}...`;for(const file of files){try{const page=await processFile(file);currentDocument.pages.push({id:newId(),...page});renderPages()}catch(error){console.error(error)}}await saveNow();$('feedback').textContent='Páginas processadas e salvas neste aparelho.'}
+async function saveNow(){syncFields();currentDocument.updatedAt=new Date().toISOString();await saveDocument()}
+function setOnlineStatus(){const online=navigator.onLine;$('offlineStatus').textContent=online?'● Online':'● Offline';$('offlineStatus').classList.toggle('offline',!online)}
+function splitText(doc,text,width){return doc.splitTextToSize(text||'—',width)}
+function header(doc,page,title,company){doc.setFillColor(18,48,71);doc.rect(0,0,210,22,'F');doc.setTextColor(255);doc.setFontSize(15);doc.setFont(undefined,'bold');doc.text(company||'Blexo-Check',12,14);doc.setFont(undefined,'normal');doc.setFontSize(9);doc.text(`DIGITALIZAÇÃO · ${page}`,198,14,{align:'right'});doc.setTextColor(30,46,56);doc.setFontSize(17);doc.setFont(undefined,'bold');doc.text(title||'Documento',12,35);doc.setFont(undefined,'normal')}
+function drawImageA4(doc,src){const pageW=210,pageH=297,left=10,right=10,top=43,bottom=10,maxW=pageW-left-right,maxH=pageH-top-bottom;return new Promise(resolve=>{const img=new Image();img.onload=()=>{const ratio=Math.min(maxW/img.naturalWidth,maxH/img.naturalHeight),w=img.naturalWidth*ratio,h=img.naturalHeight*ratio,x=(pageW-w)/2,y=top+(maxH-h)/2;doc.addImage(src,'JPEG',x,y,w,h,undefined,'FAST');resolve()};img.src=src})}
+async function generatePdf(){if(!window.jspdf){$('feedback').textContent='O gerador de PDF ainda não foi carregado. Conecte-se à internet uma vez e tente novamente.';return}await saveNow();const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4',compress:true}),title=currentDocument.name||'Documento digitalizado';for(let i=0;i<currentDocument.pages.length;i++){if(i)doc.addPage();header(doc,String(i+1),title,currentDocument.company);if(currentDocument.reference){doc.setFontSize(8.5);doc.setTextColor(100);doc.text(splitText(doc,currentDocument.reference,186),12,40)}await drawImageA4(doc,currentDocument.pages[i].src);if(currentDocument.pages[i].title){doc.setFontSize(8);doc.setTextColor(90);doc.text(currentDocument.pages[i].title,12,292)}}if(currentDocument.notes||currentDocument.responsible){doc.addPage();header(doc,String(currentDocument.pages.length+1),title,currentDocument.company);let y=50;if(currentDocument.responsible){doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(30,46,56);doc.text('Responsável',12,y);doc.setFont(undefined,'normal');doc.text(currentDocument.responsible,50,y);y+=12}if(currentDocument.notes){doc.setFont(undefined,'bold');doc.text('Observações finais',12,y);y+=8;doc.setFont(undefined,'normal');doc.setFontSize(9);doc.text(splitText(doc,currentDocument.notes,180),12,y)}}const safe=title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();doc.save(`blexo-documento-${safe||'digitalizado'}.pdf`);$('feedback').textContent='PDF gerado e download iniciado.'}
+function updateCleanLabel(){$('cleanValue').textContent=`${$('cleanLevel').value}%`}
+['documentName','company','reference','responsible','notes'].forEach(id=>$(id).addEventListener('input',()=>{syncFields();scheduleSave()}));
+$('cameraInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value='' });$('galleryInput').addEventListener('change',e=>{addFiles(e.target.files);e.target.value=''});$('generateButton').onclick=generatePdf;$('cleanLevel').addEventListener('input',()=>{updateCleanLabel();syncFields();scheduleSave()});document.querySelectorAll('input[name="scanMode"]').forEach(r=>r.addEventListener('change',()=>{syncFields();scheduleSave('Modo de tratamento alterado. Novas fotos usarão esta configuração.') }));window.addEventListener('online',setOnlineStatus);window.addEventListener('offline',setOnlineStatus);
+(async()=>{try{const documents=await getDocuments();if(documents.length)currentDocument=documents.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt))[0];render();setOnlineStatus();if(navigator.onLine)ensureCV().catch(()=>{});}catch{render();setOnlineStatus()}})();
