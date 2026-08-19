@@ -1,10 +1,34 @@
-// Blexo Suite — configuração do Google
-//
-// 1. Crie um OAuth Client ID do tipo "Web application" no Google Cloud.
-// 2. Coloque o Client ID abaixo.
-// 3. Cadastre o domínio do Blexo em "Authorized JavaScript origins".
-//
-// Exemplo: 123456789012-abc123.apps.googleusercontent.com
-window.BLEXO_GOOGLE_CONFIG = {
-  clientId: 'COLOQUE_SEU_CLIENT_ID_AQUI.apps.googleusercontent.com'
+const BLEXO_CONFIG_KEY = 'blexo-unificado-config-v2';
+const BLEXO_DEFAULT_CONFIG = {
+  watermark: true,
+  photoTemplate: 'two',
+  sealConfig: 'Antes|texto|#123047\nDepois|texto|#176d9a\nVerde|bolinha|#36a269\nAmarelo|bolinha|#e5b22e\nVermelho|bolinha|#cb4c4c',
+  blockCount: 26,
+  commonAreas: ['Área Comum 01', 'Área Comum 02'],
+  enableGas: true,
+  enableWater: true,
+  checkHeaderColor: '#123047',
+  leituristaHeaderColor: '#123047',
+  scannerHeaderColor: '#123047',
+  checkHeaderName: 'Blexo-Check',
+  leituristaHeaderName: 'Blexo-Check',
+  scannerHeaderName: 'Blexo-Check',
+  checkHeaderIcon: '✓',
+  leituristaHeaderIcon: 'L',
+  scannerHeaderIcon: 'S'
 };
+function blexoConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BLEXO_CONFIG_KEY) || 'null');
+    return {...BLEXO_DEFAULT_CONFIG, ...(saved || {})};
+  } catch { return {...BLEXO_DEFAULT_CONFIG}; }
+}
+function saveBlexoConfig(config) {
+  const merged = {...BLEXO_DEFAULT_CONFIG, ...(config || {})};
+  localStorage.setItem(BLEXO_CONFIG_KEY, JSON.stringify(merged));
+  return merged;
+}
+function resetBlexoConfig() {
+  localStorage.setItem(BLEXO_CONFIG_KEY, JSON.stringify(BLEXO_DEFAULT_CONFIG));
+  return {...BLEXO_DEFAULT_CONFIG};
+}

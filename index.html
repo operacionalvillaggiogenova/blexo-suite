@@ -1,21 +1,43 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#123047"><meta name="description" content="Relatórios fotográficos de campo, mesmo sem internet.">
-  <link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="observation-size.css"><link rel="stylesheet" href="seals.css"><title>Blexo-Check</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#123047"><meta name="description" content="Blexo — ferramentas de campo offline.">
+<link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="dashboard.css"><title>Blexo</title>
 </head>
 <body>
-  <header class="topbar"><button class="brand" id="reportsButton" aria-label="Abrir relatórios"><span class="brand-mark">✓</span><span>Blexo-<strong>Check</strong></span></button><div class="top-actions"><span id="offlineStatus" class="online-status">● Online</span><span id="syncStatus" class="sync-status">Não conectado</span><button class="google-button" id="googleButton" type="button">Conectar Google</button><button class="icon-button" id="settingsButton" aria-label="Abrir configurações">⚙</button></div></header>
-  <main>
-    <section class="hero compact-hero"><p class="eyebrow">RELATÓRIO FOTOGRÁFICO</p><h1 id="reportHeading">Novo relatório</h1><p>Funciona offline. Conecte sua conta Google/Gmail para sincronizar com o Google Drive.</p></section>
-    <section class="card report-name-card"><label>Nome do relatório<input id="reportName" placeholder="Ex.: OS 2048 — Edifício Horizonte"></label><div class="report-actions"><button class="secondary-button" id="newReportButton">＋ Novo relatório</button><button class="text-button" id="reportsButtonInline">Ver relatórios</button></div></section>
-    <section class="card form-card" aria-labelledby="serviceTitle"><div class="section-title"><span class="step">1</span><h2 id="serviceTitle">Dados do serviço</h2></div><label>Cliente ou obra<input id="client" placeholder="Ex.: Ed. Horizonte"></label><label>Endereço / local<input id="location" placeholder="Ex.: Rua das Flores, 123"></label><label>Descrição do serviço<textarea id="service" rows="3" placeholder="Ex.: Manutenção preventiva no quadro elétrico"></textarea></label></section>
-    <section class="card capture-card" aria-labelledby="photosTitle"><div class="section-title"><span class="step">2</span><h2 id="photosTitle">Evidências fotográficas</h2><span id="photoCount" class="count">0 fotos</span></div><p class="hint">Cada bloco organiza um conjunto de fotos com um subtítulo próprio.</p><div id="evidenceBlocks" aria-live="polite"></div><button id="addBlockButton" class="add-block" type="button">＋ Adicionar bloco de evidências</button></section>
-    <section class="card form-card" aria-labelledby="notesTitle"><div class="section-title"><span class="step">3</span><h2 id="notesTitle">Observações</h2></div><label>Responsável técnico<input id="technician" placeholder="Seu nome"></label><label>Observações finais<textarea id="notes" rows="3" placeholder="Materiais utilizados, pendências ou recomendações"></textarea></label></section>
-    <button id="generateButton" class="generate" disabled>Gerar e baixar PDF <span>→</span></button><p id="feedback" class="feedback" role="status"></p>
-  </main>
-  <dialog id="reportsDialog"><div class="dialog-shell"><div class="dialog-title"><h2>Meus relatórios</h2><button class="icon-button" data-close="reportsDialog" aria-label="Fechar">×</button></div><p class="dialog-hint">Os relatórios ficam apenas neste aparelho.</p><div id="reportsList"></div></div></dialog>
-  <dialog id="settingsDialog"><form method="dialog" class="settings"><div class="dialog-title"><h2>Configurações</h2><button class="icon-button" value="cancel" aria-label="Fechar">×</button></div><label class="switch-row"><span><strong>Marca-d’água</strong><small>Usa EXIF da galeria ou data do sistema na câmera</small></span><input id="watermark" type="checkbox" checked></label><label>Modelo das fotos<select id="photoTemplate"><option value="two">2 por linha (detalhado)</option><option value="one">1 por linha (grande)</option><option value="four">4 por página (compacto)</option></select></label><label>Nome da empresa (opcional)<input id="company" placeholder="Ex.: Sua Empresa Ltda."></label><label>Opções de selo<small class="field-help">Uma por linha: Nome | texto ou bolinha | cor hexadecimal.</small><textarea id="sealConfig" rows="5"></textarea></label><button class="save-settings" value="default">Salvar configurações</button></form></dialog>
-  <script src="https://accounts.google.com/gsi/client" async defer></script><script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script><script src="config.js"></script><script src="app.js"></script><script src="sync.js"></script>
-</body>
-</html>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">✓</span><span>Blexo-<strong>Check</strong></span></div>
+  <div class="top-actions"><span id="offlineStatus" class="online-status">● Online</span><button id="settingsButton" class="settings-button" aria-label="Configurações">⚙</button></div>
+</header>
+<main>
+  <section class="hero"><p class="eyebrow">FERRAMENTAS DE CAMPO</p><h1>Blexo-Check</h1><p>Um único aplicativo para checagem, leitura e digitalização. Os dados permanecem no aparelho e as ferramentas continuam disponíveis offline.</p></section>
+  <section class="modules">
+    <a class="module-card" href="check.html"><span class="module-icon">✓</span><div><h2>Checagem e evidências</h2><p>Inspeções, fotos, observações e relatório fotográfico em PDF.</p></div><span class="arrow">→</span></a>
+    <a class="module-card" href="leiturista.html"><span class="module-icon">▣</span><div><h2>Leiturista</h2><p>Leituras de gás e água por bloco e área comum, com evidências.</p></div><span class="arrow">→</span></a>
+    <a class="module-card" href="scanner.html"><span class="module-icon">▤</span><div><h2>Scanner</h2><p>Fotografe documentos, corrija perspectiva e gere PDF.</p></div><span class="arrow">→</span></a>
+  </section>
+  <section class="info-card"><strong>Armazenamento local</strong><span>Relatórios e fotos são salvos somente neste aparelho.</span><span id="storageStatus">Verificando armazenamento…</span></section>
+</main>
+<dialog id="settingsDialog">
+<form method="dialog" class="settings">
+<div class="dialog-title"><h2>Configurações</h2><button class="close" value="cancel">×</button></div>
+<p class="hint">As configurações abaixo são independentes para cada módulo. As cores definem a faixa azul do cabeçalho de cada tipo de relatório.</p>
+<label class="switch-row"><span><strong>Marca-d’água</strong><small>Data/hora na evidência fotográfica.</small></span><input id="watermark" type="checkbox"></label>
+<label>Miniaturas por página<select id="photoTemplate"><option value="one">1 — grande</option><option value="two">2 — padrão</option><option value="four">4 — compacto</option></select></label>
+<label>Quantidade de blocos<input id="blockCount" type="number" min="0" max="200"></label>
+<label>Áreas comuns <small>Uma por linha. Apague as linhas que não utilizar.</small><textarea id="commonAreas" rows="4"></textarea></label>
+<div class="switch-grid"><label class="switch-row"><span><strong>Habilitar gás</strong></span><input id="enableGas" type="checkbox"></label><label class="switch-row"><span><strong>Habilitar água</strong></span><input id="enableWater" type="checkbox"></label></div>
+<div class="settings-section-title">Cabeçalho dos relatórios</div>
+<p class="settings-help">Cada módulo tem sua própria faixa e nome. O nome será usado no PDF.</p>
+<div class="header-config-grid">
+  <div class="header-config-card"><strong>Checagem e evidências</strong><label>Nome no cabeçalho<input id="checkHeaderName" maxlength="40" placeholder="Blexo-Check"></label><label>Cor da faixa<input id="checkHeaderColor" type="color" value="#123047" aria-label="Cor da faixa da Checagem e evidências"><small id="checkHeaderColorValue">#123047</small></label></div>
+  <div class="header-config-card"><strong>Leiturista</strong><label>Nome no cabeçalho<input id="leituristaHeaderName" maxlength="40" placeholder="Blexo-Check"></label><label>Cor da faixa<input id="leituristaHeaderColor" type="color" value="#123047" aria-label="Cor da faixa do Leiturista"><small id="leituristaHeaderColorValue">#123047</small></label></div>
+  <div class="header-config-card"><strong>Scanner</strong><label>Nome no cabeçalho<input id="scannerHeaderName" maxlength="40" placeholder="Blexo-Check"></label><label>Cor da faixa<input id="scannerHeaderColor" type="color" value="#123047" aria-label="Cor da faixa do Scanner"><small id="scannerHeaderColorValue">#123047</small></label></div>
+</div>
+<label>Opções de selo Leiturista <small>Uma por linha: Nome | texto ou bolinha | cor hexadecimal.</small><textarea id="sealConfig" rows="5"></textarea></label>
+<div class="settings-actions"><button id="resetSettings" type="button" class="secondary">Restaurar padrão</button><button id="saveSettings" value="default" class="primary">Salvar configurações</button></div>
+</form>
+</dialog>
+<script src="config.js?v=16"></script><script src="dashboard.js?v=16"></script>
+</body></html>
