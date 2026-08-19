@@ -1,1 +1,11 @@
-{"name":"Blexo-Check","short_name":"Blexo-Check","start_url":"./","display":"standalone","background_color":"#f4f7f8","theme_color":"#123047","icons":[]}
+{
+  "name": "Blexo-Check",
+  "short_name": "Blexo-Check",
+  "description": "Relatórios fotográficos de campo, mesmo sem internet.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7f8",
+  "theme_color": "#123047",
+  "icons": []
+}

@@ -1,22 +1,34 @@
-# Blexo-Check
+# Blexo-Check — versão de manutenção
 
-Aplicativo web instalável para coleta de leituras de gás e água, com evidências fotográficas e relatório PDF.
+Aplicativo web instalável para criar relatórios fotográficos de campo em PDF.
+
+## Melhorias desta versão
+
+- Geração de PDF aguarda o carregamento do jsPDF antes de executar, evitando o problema de clicar em “Gerar e baixar PDF” enquanto a biblioteca ainda não terminou de carregar.
+- Erros de geração agora são exibidos na própria tela, em vez de deixar o botão aparentemente sem resposta.
+- O botão de PDF é reabilitado corretamente após sucesso ou erro.
+- Service Worker atualizado para v6: os arquivos locais são pré-cacheados e recursos externos, como o jsPDF, passam a ser armazenados em cache durante o uso online.
+- O modo offline continua usando IndexedDB para relatórios, fotos e observações.
 
 ## Dados e funcionamento offline
 
-- Relatórios, leituras, fotos e observações são salvos somente no navegador do aparelho, via IndexedDB.
-- Não há banco de dados, API ou envio de fotos para o servidor. Cada relatório possui 26 blocos e 2 áreas comuns, com campos de leitura GAS e ÁGUA.
-- Após abrir o app uma vez com internet, os arquivos do aplicativo e o gerador de PDF ficam em cache e o uso segue offline.
-- Não limpe os dados do navegador e não desinstale o aplicativo se quiser preservar os relatórios locais. Os dados não são compartilhados entre aparelhos.
+- Relatórios, fotos e observações são salvos somente no navegador do aparelho, via IndexedDB.
+- Não há banco de dados, API ou envio de fotos para o servidor.
+- Após abrir o app uma vez com internet e carregar o gerador de PDF, o uso pode continuar offline.
 
 ## Executar localmente
 
 ```powershell
-python -m http.server 8000
+node server.js
 ```
 
-Abra `http://localhost:8000`.
+Abra `http://localhost:3000`.
 
 ## Publicação
 
-Pode ser publicada diretamente em GitHub Pages, Cloudflare Pages ou outro host estático. Use HTTPS em produção: navegadores de celular somente liberam a câmera em um contexto seguro.
+Copie a pasta para a área pública da aplicação Node existente e sirva-a com HTTPS em produção.
+
+
+## Sincronização Google/Gmail + Drive
+
+A v24 adiciona autenticação com conta Google/Gmail e sincronização offline-first com `Meu Drive/Blexo Suite/check`. Veja `GOOGLE_SETUP.md` antes de publicar. O Client ID fica em `config.js`; não há client secret no navegador.

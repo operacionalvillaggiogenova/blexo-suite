@@ -1,0 +1,4 @@
+// Servidor opcional para testar/publicar esta pasta em uma instalação Node existente.
+const http = require('http'), fs = require('fs'), path = require('path');
+const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webmanifest':'application/manifest+json'};
+http.createServer((req,res)=>{ const clean = req.url.split('?')[0] === '/' ? '/index.html' : req.url.split('?')[0]; const file = path.join(__dirname, clean); if (!file.startsWith(__dirname)) return res.writeHead(403).end(); fs.readFile(file,(err,data)=>{ if(err) return res.writeHead(404).end('Não encontrado'); res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream'});res.end(data); }); }).listen(process.env.PORT||3000,()=>console.log('CampoFoto em http://localhost:'+(process.env.PORT||3000)));
