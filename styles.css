@@ -11,5 +11,3 @@
 .tool-link{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 
 .settings-section-title{font-size:13px;font-weight:800;color:#34454f;margin:18px 0 10px;padding-top:12px;border-top:1px solid var(--line)}.settings input[type="color"]{height:42px;padding:4px;cursor:pointer}
-
-.pdf-actions{display:flex;flex-direction:column;gap:9px;margin-top:24px}.pdf-actions .generate{margin:0;width:100%}.save-pdf,.share-pdf{width:calc(100% - 32px);margin:0 16px;border:1px solid #b9d9e9;border-radius:10px;padding:12px 16px;font:inherit;font-weight:800;min-height:48px;cursor:pointer}.save-pdf{background:#f7fcfe;color:var(--blue)}.share-pdf{background:#fff;color:var(--blue)}.save-pdf:disabled,.share-pdf:disabled{opacity:.5;cursor:not-allowed}@media(min-width:700px){.pdf-actions{max-width:760px;margin-left:auto;margin-right:auto}.save-pdf,.share-pdf{width:calc(100% - 32px)}}

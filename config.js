@@ -4,7 +4,7 @@ const BLEXO_DEFAULT_CONFIG = {
   photoTemplate: 'two',
   sealConfig: 'Antes|texto|#123047\nDepois|texto|#176d9a\nVerde|bolinha|#36a269\nAmarelo|bolinha|#e5b22e\nVermelho|bolinha|#cb4c4c',
   blockCount: 26,
-  commonAreas: ['Área Comum 01', 'Área Comum 02'],
+  commonAreas: ['Salões 1', 'Salões 2', 'Academia', 'Sanepar'],
   enableGas: true,
   enableWater: true,
   checkHeaderColor: '#123047',

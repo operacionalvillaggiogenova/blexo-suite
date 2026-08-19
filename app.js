@@ -44,10 +44,7 @@ function ensureReportShape(report) {
 }
 function scheduleSave(message = 'Salvo neste aparelho') { clearTimeout(saveTimer); saveTimer = setTimeout(async () => { currentReport.updatedAt = new Date().toISOString(); await saveReport(currentReport); $('feedback').textContent = message; }, 350); }
 function sealOptions() { return settings().sealConfig.split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => { const [label, kind = 'texto', color = '#123047'] = line.split('|').map(part => part.trim()); return { label, kind: kind.toLowerCase() === 'bolinha' ? 'dot' : 'text', color: /^#[0-9a-f]{6}$/i.test(color) ? color : '#123047' }; }).filter(option => option.label); }
-window.blexoShareMeta = () => ({ subject: currentReport?.name || 'Leiturista Blexo-Check', text: `Segue o relatório de leituras “${currentReport?.name || 'Leiturista Blexo-Check'}”.${currentReport?.client ? '\n' + currentReport.client : ''}${currentReport?.technician ? '\nResponsável: ' + currentReport.technician : ''}` });
-
-function syncFields() { if (window.BlexoPdfActions) BlexoPdfActions.reset(); 
-['reportName', 'client', 'location', 'service', 'technician', 'notes'].forEach(id => { currentReport[id === 'reportName' ? 'name' : id] = $(id).value.trim(); }); currentReport.settings = { watermark: $('watermark').checked, template: $('photoTemplate').value, company: $('company').value.trim(), sealConfig: $('sealConfig').value.trim() || DEFAULT_SEAL_CONFIG }; $('reportHeading').textContent = currentReport.name || 'Novo relatório'; }
+function syncFields() { ['reportName', 'client', 'location', 'service', 'technician', 'notes'].forEach(id => { currentReport[id === 'reportName' ? 'name' : id] = $(id).value.trim(); }); currentReport.settings = { watermark: $('watermark').checked, template: $('photoTemplate').value, company: $('company').value.trim(), sealConfig: $('sealConfig').value.trim() || DEFAULT_SEAL_CONFIG }; $('reportHeading').textContent = currentReport.name || 'Novo relatório'; }
 function renderReport() { const r = ensureReportShape(currentReport); ['reportName', 'client', 'location', 'service', 'technician', 'notes'].forEach(id => { $(id).value = r[id === 'reportName' ? 'name' : id] || ''; }); $('watermark').checked = r.settings.watermark; $('photoTemplate').value = r.settings.template; $('company').value = r.settings.company; $('sealConfig').value = r.settings.sealConfig; $('reportHeading').textContent = r.name || 'Novo relatório'; renderBlocks(); }
 function findGroup(id) { return currentReport.groups.find(group => group.id === id); }
 function photoPicker(group, photo, photoIndex) { const options = sealOptions(); return `<article class="photo"><img src="${photo.src}" alt="Foto ${photoIndex + 1}"><span class="tag">${escapeHtml(group.title || 'Evidência')}</span><select class="seal-picker" data-seal="${group.id}:${photo.id}" aria-label="Selo da foto"><option value="">Selo</option>${options.map(option => `<option value="${escapeHtml(option.label)}" ${photo.seal === option.label ? 'selected' : ''}>${option.kind === 'dot' ? '● ' : ''}${escapeHtml(option.label)}</option>`).join('')}</select><button class="remove" data-remove-photo="${group.id}:${photo.id}" aria-label="Excluir foto">×</button><textarea class="photo-note" data-note="${group.id}:${photo.id}" placeholder="Observação desta foto">${escapeHtml(photo.note)}</textarea></article>`; }
@@ -263,9 +260,9 @@ function generatePdf() {
   drawReadingsTable(doc, currentReport.groups);
 
   const safe = (currentReport.name || 'relatorio').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-  const fileName = `blexo-check-${safe}.pdf`; const blob = doc.output('blob'); if (window.BlexoPdfActions) BlexoPdfActions.setPdf(blob, fileName, { subject: currentReport.name || 'Leiturista Blexo-Check', text: `Segue o relatório de leituras “${currentReport.name || 'Leiturista Blexo-Check'}”.${currentReport.client ? '\n' + currentReport.client : ''}${currentReport.technician ? '\nResponsável: ' + currentReport.technician : ''}` });
+  doc.save(`blexo-check-${safe}.pdf`);
   saveNow();
-  $('feedback').textContent = 'PDF gerado com sucesso. Você pode salvar ou enviar/compartilhar.';
+  $('feedback').textContent = 'PDF gerado e download iniciado.';
 }
 
 ['reportName', 'client', 'location', 'service', 'technician', 'notes'].forEach(id => $(id).addEventListener('input', () => { syncFields(); scheduleSave(); }));
