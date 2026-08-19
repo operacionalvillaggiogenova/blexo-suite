@@ -1,4 +1,4 @@
-const BLEXO_CONFIG_KEY = 'blexo-unificado-config-v2';
+const BLEXO_CONFIG_KEY = 'blexo-suite-config-v3';
 const BLEXO_DEFAULT_CONFIG = {
   watermark: true,
   photoTemplate: 'two',
@@ -15,7 +15,8 @@ const BLEXO_DEFAULT_CONFIG = {
   scannerHeaderName: 'Blexo-Check',
   checkHeaderIcon: '✓',
   leituristaHeaderIcon: 'L',
-  scannerHeaderIcon: 'S'
+  scannerHeaderIcon: 'S',
+  budgetHeaderColor: '#123047', budgetHeaderName: 'Blexo Suite', budgetHeaderIcon: 'R', googleClientId: '', googleDriveFolder: 'Blexo Suite'
 };
 function blexoConfig() {
   try {

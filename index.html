@@ -17,12 +17,12 @@
     <a class="module-card" href="leiturista.html"><span class="module-icon">▣</span><div><h2>Leiturista</h2><p>Leituras de gás e água por bloco e área comum, com evidências.</p></div><span class="arrow">→</span></a>
     <a class="module-card" href="scanner.html"><span class="module-icon">▤</span><div><h2>Scanner</h2><p>Fotografe documentos, corrija perspectiva e gere PDF.</p></div><span class="arrow">→</span></a>
   </section>
-  <section class="info-card"><strong>Armazenamento local</strong><span>Relatórios e fotos são salvos somente neste aparelho.</span><span id="storageStatus">Verificando armazenamento…</span></section>
+  <a class="module-card" href="orcamentos.html"><span class="module-icon">R$</span><div><h2>Orçamentos</h2><p>Monte propostas, inclua evidências e gere PDF.</p></div><span class="arrow">→</span></a></section><section class="info-card"><strong>Armazenamento local</strong><span>Relatórios e fotos são salvos somente neste aparelho.</span><span id="storageStatus">Verificando armazenamento…</span></section>
 </main>
 <dialog id="settingsDialog">
 <form method="dialog" class="settings">
 <div class="dialog-title"><h2>Configurações</h2><button class="close" value="cancel">×</button></div>
-<p class="hint">As configurações abaixo são independentes para cada módulo. As cores definem a faixa azul do cabeçalho de cada tipo de relatório.</p>
+<div class="header-config-card"><strong>Google Drive</strong><label>Google OAuth Client ID<input id="googleClientId" placeholder="xxxx.apps.googleusercontent.com"></label><label>Pasta no Drive<input id="googleDriveFolder" placeholder="Blexo Suite"></label><button type="button" class="secondary" id="connectGoogle">Conectar Google</button><small id="googleStatus">Não conectado.</small></div>
 <label class="switch-row"><span><strong>Marca-d’água</strong><small>Data/hora na evidência fotográfica.</small></span><input id="watermark" type="checkbox"></label>
 <label>Miniaturas por página<select id="photoTemplate"><option value="one">1 — grande</option><option value="two">2 — padrão</option><option value="four">4 — compacto</option></select></label>
 <label>Quantidade de blocos<input id="blockCount" type="number" min="0" max="200"></label>
@@ -40,4 +40,4 @@
 </form>
 </dialog>
 <script src="config.js?v=16"></script><script src="dashboard.js?v=16"></script>
-</body></html>
+<script src="config.js"></script><script src="google-sync.js"></script><script src="dashboard.js?v=25"></script></body></html>
