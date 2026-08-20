@@ -2,3 +2,6 @@
 
 .settings-help{font-size:11px;color:var(--muted);margin:-4px 0 12px}.header-config-grid{display:grid;grid-template-columns:1fr;gap:10px}.header-config-card{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fbfdfe}.header-config-card>strong{display:block;font-size:12px;color:var(--blue);margin-bottom:9px}.header-config-card label{margin-bottom:9px}.header-config-card input[type="color"]{margin-top:5px}@media(min-width:620px){.header-config-grid{grid-template-columns:repeat(3,1fr)}}
 .header-config-card small{margin-top:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--muted)}
+.google-connect-button{border:1px solid #5cbce6;background:#fff;color:#123047;border-radius:8px;padding:8px 11px;font:700 12px/1 system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.google-connect-button.connected{background:#eaf7ee;border-color:#8acb9b;color:#1e6b37}
+@media(max-width:560px){.google-connect-button{font-size:11px;padding:7px 8px}.top-actions{gap:4px}}

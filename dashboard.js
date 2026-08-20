@@ -7,4 +7,40 @@ $('resetSettings').onclick=()=>{resetBlexoConfig();renderSettings()}
 window.addEventListener('online',setOnlineStatus);window.addEventListener('offline',setOnlineStatus);setOnlineStatus();$('storageStatus').textContent='Uso offline disponível após o primeiro carregamento.';['checkHeaderColor','leituristaHeaderColor','scannerHeaderColor'].forEach(id=>$(id).addEventListener('input',e=>$(id+'Value').textContent=e.target.value.toUpperCase()))
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{})
 
-if($('connectGoogle'))$('connectGoogle').onclick=async()=>{try{await blexoConnectGoogle();$('googleStatus').textContent='Conectado ✓'}catch(e){$('googleStatus').textContent=e.message}};
+
+function blexoUpdateGoogleUI(){
+  const btn=$('globalGoogleButton');
+  const status=localStorage.getItem('blexo-google-email');
+  if(btn){
+    if(status){
+      btn.textContent='✓ Google Drive conectado';
+      btn.classList.add('connected');
+      btn.title='Clique para conectar ou renovar a autorização';
+    }else{
+      btn.textContent='☁️ Conectar Google Drive';
+      btn.classList.remove('connected');
+      btn.title='Entrar com Google e autorizar o Blexo Suite';
+    }
+  }
+  if($('googleStatus')) $('googleStatus').textContent=status||'Não conectado.';
+}
+if($('globalGoogleButton')){
+  $('globalGoogleButton').onclick=async()=>{
+    const btn=$('globalGoogleButton');
+    const original=btn.textContent;
+    btn.disabled=true;
+    btn.textContent='Conectando...';
+    try{
+      await blexoConnectGoogle();
+      localStorage.setItem('blexo-google-email','Google Drive conectado');
+      blexoUpdateGoogleUI();
+    }catch(e){
+      alert('Não foi possível conectar ao Google: '+e.message);
+      blexoUpdateGoogleUI();
+    }finally{
+      btn.disabled=false;
+      if(!localStorage.getItem('blexo-google-email')) btn.textContent=original;
+    }
+  };
+}
+blexoUpdateGoogleUI();
