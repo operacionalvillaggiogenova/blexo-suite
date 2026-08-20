@@ -16,7 +16,7 @@ const BLEXO_DEFAULT_CONFIG = {
   checkHeaderIcon: '✓',
   leituristaHeaderIcon: 'L',
   scannerHeaderIcon: 'S',
-  budgetHeaderColor: '#123047', budgetHeaderName: 'Blexo Suite', budgetHeaderIcon: 'R', googleClientId: '', googleDriveFolder: 'Blexo Suite'
+  budgetHeaderColor: '#123047', budgetHeaderName: 'Blexo Suite', budgetHeaderIcon: 'R', googleClientId: '212427726646-vmf3c5qfmfvln3agbrtk8mo25iogs9o9.apps.googleusercontent.com', googleDriveFolder: 'Blexo Suite'
 };
 function blexoConfig() {
   try {

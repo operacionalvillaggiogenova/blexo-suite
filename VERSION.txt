@@ -1,1 +1,3 @@
-Blexo-Check v24 — Google/Gmail + Google Drive sync
+Blexo Suite v26 — Login Google simplificado + Orçamentos
+Client Secret não incluído.
+Client ID configurado na aplicação.
