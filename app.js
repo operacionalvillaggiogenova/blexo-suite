@@ -1,4 +1,6 @@
 const $ = id => document.getElementById(id);
+const photoTemplateSelect = $('photoTemplate');
+if (photoTemplateSelect && !photoTemplateSelect.querySelector('[value="six"]')) photoTemplateSelect.insertAdjacentHTML('beforeend', '<option value="six">6 por página (compacto)</option>');
 const DB_NAME = 'blexo-check-medicoes', STORE = 'reports';
 const DEFAULT_SEAL_CONFIG = 'Antes|texto|#123047\nDepois|texto|#176d9a\nVerde|bolinha|#36a269\nAmarelo|bolinha|#e5b22e\nVermelho|bolinha|#cb4c4c';
 let currentReport, saveTimer;
@@ -7,7 +9,7 @@ function meterTitles(){const c=typeof blexoConfig==='function'?blexoConfig():{bl
 function METER_BLOCKS(){return meterTitles();}
 const newBlock = (title = '') => ({ id: newId(), title, photos: [], gas: '', water: '' });
 const newMeterGroups = () => meterTitles().map(title => newBlock(title));
-const defaultSettings = () => { const c=typeof blexoConfig==='function'?blexoConfig():{}; return { watermark:c.watermark!==false, template:c.photoTemplate||'two', company:'', sealConfig:c.sealConfig||DEFAULT_SEAL_CONFIG }; };
+const defaultSettings = () => { const c=typeof blexoConfig==='function'?blexoConfig():{}; return { watermark:c.watermark!==false, template:c.checkPhotoTemplate||c.photoTemplate||'two', company:'', sealConfig:c.sealConfig||DEFAULT_SEAL_CONFIG }; };
 const blankReport = () => ({ id: newId(), name: 'Novo relatório', client: '', location: '', service: '', technician: '', notes: '', settings: defaultSettings(), groups: newMeterGroups(), updatedAt: new Date().toISOString() });
 
 function openDatabase() { return new Promise((resolve, reject) => { const request = indexedDB.open(DB_NAME, 1); request.onupgradeneeded = () => request.result.createObjectStore(STORE, { keyPath: 'id' }); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
@@ -100,8 +102,103 @@ function renderBlocks() {
 }
 
 function exifDateText(file) { return file.arrayBuffer().then(buffer => { const view = new DataView(buffer); if (view.byteLength < 14 || view.getUint16(0, false) !== 0xffd8) return null; let offset = 2; while (offset + 4 < view.byteLength) { if (view.getUint8(offset) !== 0xff) { offset++; continue; } const marker = view.getUint8(offset + 1), length = view.getUint16(offset + 2, false); if (marker === 0xe1 && offset + 10 < view.byteLength && String.fromCharCode(...new Uint8Array(buffer, offset + 4, 4)) === 'Exif') { const tiff = offset + 10, endian = view.getUint16(tiff, false), little = endian === 0x4949; if (!(little || endian === 0x4d4d) || view.getUint16(tiff + 2, little) !== 42) return null; const read16 = pos => view.getUint16(pos, little), read32 = pos => view.getUint32(pos, little); const readIfd = pos => { if (pos < tiff || pos + 2 > view.byteLength) return []; const count = read16(pos), entries = []; for (let i = 0; i < count; i++) { const entry = pos + 2 + i * 12; if (entry + 12 > view.byteLength) break; entries.push({ tag: read16(entry), type: read16(entry + 2), count: read32(entry + 4), value: entry + 8 }); } return entries; }; const ascii = entry => { if (!entry || entry.type !== 2) return null; const pos = entry.count <= 4 ? entry.value : tiff + read32(entry.value); if (pos + entry.count > view.byteLength) return null; return new TextDecoder('ascii').decode(new Uint8Array(buffer, pos, entry.count)).replace(/\0/g, '').trim(); }; const ifd0 = readIfd(tiff + read32(tiff + 4)); const exifPointer = ifd0.find(entry => entry.tag === 0x8769); const exifIfd = exifPointer ? readIfd(tiff + read32(exifPointer.value)) : []; const raw = ascii(exifIfd.find(entry => entry.tag === 0x9003)) || ascii(exifIfd.find(entry => entry.tag === 0x9004)); const match = raw?.match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2})(?::\d{2})?$/); return match ? `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}` : null; } if (length < 2) break; offset += 2 + length; } return null; }).catch(() => null); }
-function drawWatermark(image, text) { const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight; ctx.drawImage(image, 0, 0); if (settings().watermark && text) { const size = Math.max(22, Math.round(canvas.width / 34)), padding = Math.round(size * .65), inset = Math.max(padding, Math.round(canvas.width * .018)); ctx.font = `600 ${size}px Arial`; const boxWidth = Math.ceil(ctx.measureText(text).width + padding * 2), boxHeight = size + padding * 2, x = canvas.width - boxWidth - inset, y = canvas.height - boxHeight - inset; ctx.fillStyle = 'rgba(0,0,0,.70)'; ctx.fillRect(x, y, boxWidth, boxHeight); ctx.fillStyle = 'white'; ctx.textBaseline = 'middle'; ctx.fillText(text, x + padding, y + boxHeight / 2); ctx.textBaseline = 'alphabetic'; } return canvas.toDataURL('image/jpeg', .86); }
-function addFiles(groupId, source, fileList) { const group = findGroup(groupId); [...fileList].filter(file => file.type.startsWith('image/')).forEach(async file => { const insertedAt = new Date().toISOString(), watermarkText = source === 'camera' ? formatDate(insertedAt) : await exifDateText(file), reader = new FileReader(); reader.onload = () => { const image = new Image(); image.onload = () => { group.photos.push({ id: newId(), src: drawWatermark(image, watermarkText), insertedAt, watermarkText, seal: '', note: '' }); renderBlocks(); scheduleSave(); }; image.src = reader.result; }; reader.readAsDataURL(file); }); }
+function drawWatermark(image, text) {
+  // Aceita tanto HTMLImageElement quanto HTMLCanvasElement.
+  // No Android, normalizePhoto() entrega um canvas; canvas não possui
+  // naturalWidth/naturalHeight, o que podia gerar uma imagem vazia.
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+
+  if (!width || !height) {
+    throw new Error('Não foi possível identificar o tamanho da imagem.');
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.fillStyle = 'white';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0, width, height);
+
+  if (settings().watermark && text) {
+    const size = Math.max(22, Math.round(canvas.width / 34));
+    const padding = Math.round(size * .65);
+    const inset = Math.max(padding, Math.round(canvas.width * .018));
+    ctx.font = `600 ${size}px Arial`;
+
+    const boxWidth = Math.ceil(ctx.measureText(text).width + padding * 2);
+    const boxHeight = size + padding * 2;
+    const x = canvas.width - boxWidth - inset;
+    const y = canvas.height - boxHeight - inset;
+
+    ctx.fillStyle = 'rgba(0,0,0,.70)';
+    ctx.fillRect(x, y, boxWidth, boxHeight);
+    ctx.fillStyle = 'white';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, x + padding, y + boxHeight / 2);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  return canvas.toDataURL('image/jpeg', .92);
+}
+async function decodePhoto(file) {
+  if (!file || !file.type || !file.type.startsWith('image/')) throw new Error('Arquivo de imagem inválido.');
+  if ('createImageBitmap' in window) {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image', premultiplyAlpha: 'none' });
+      if (bitmap.width && bitmap.height) return bitmap;
+      bitmap.close?.();
+    } catch (error) { console.warn('Blexo: createImageBitmap falhou, usando decodificador alternativo.', error); }
+  }
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file), image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      if (!image.naturalWidth || !image.naturalHeight) return reject(new Error('Imagem sem dimensões válidas.'));
+      resolve(image);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Não foi possível decodificar a imagem.')); };
+    image.src = url;
+  });
+}
+function normalizePhoto(image, maxSide = 1920) {
+  const width = image.width || image.naturalWidth, height = image.height || image.naturalHeight;
+  const scale = Math.min(1, maxSide / Math.max(width, height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(width * scale));
+  canvas.height = Math.max(1, Math.round(height * scale));
+  const ctx = canvas.getContext('2d', { alpha: false });
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  image.close?.();
+  return canvas;
+}
+async function addFiles(groupId, source, fileList) {
+  const group = findGroup(groupId);
+  const files = [...fileList].filter(file => file && (!file.type || file.type.startsWith('image/')));
+  if (!files.length) return;
+  for (const file of files) {
+    try {
+      $('feedback').textContent = 'Processando foto…';
+      const insertedAt = new Date().toISOString();
+      const watermarkText = source === 'camera' ? formatDate(insertedAt) : await exifDateText(file);
+      const image = await decodePhoto(file);
+      const normalized = normalizePhoto(image, 1920);
+      const src = drawWatermark(normalized, watermarkText);
+      group.photos.push({ id: newId(), src, insertedAt, watermarkText, seal: '', note: '' });
+      renderBlocks();
+      await saveNow();
+      $('feedback').textContent = '✓ Foto adicionada e salva neste aparelho.';
+    } catch (error) {
+      console.error('Blexo: falha ao processar foto.', error);
+      $('feedback').textContent = `Não foi possível salvar esta foto: ${error?.message || 'erro desconhecido'}`;
+    }
+  }
+}
+
 
 function openReports() { renderReportsList(); $('reportsDialog').showModal(); }
 function countReportPhotos(report) { return report.groups.reduce((n, group) => n + group.photos.length, 0); }
@@ -186,8 +283,8 @@ function generatePdf() {
     y += Math.max(9, lines.length * 5 + 3);
   });
 
-  const one = settings().template === 'one', four = settings().template === 'four';
-  const cols = one ? 1 : 2, imageW = one ? 174 : (four ? 83 : 87), imageH = one ? 115 : (four ? 57 : 65);
+  const one = settings().template === 'one', six = settings().template === 'six', four = settings().template === 'four';
+  const cols = one ? 1 : (six ? 3 : 2), imageW = one ? 174 : (six ? 56 : (four ? 83 : 87)), imageH = one ? 115 : (six ? 48 : (four ? 57 : 65));
   let x = 12, yPhoto = y + 17, col = 0, page = 1, photoNumber = 0;
   doc.setFontSize(14);
   doc.setTextColor(30, 46, 56);
@@ -222,6 +319,9 @@ function generatePdf() {
         drawReadings(doc, group, 12, yPhoto + 5);
         yPhoto += 11;
       }
+      if (!photo.src || !photo.src.startsWith('data:image/')) {
+        throw new Error('Uma fotografia não está disponível em formato válido para o PDF.');
+      }
       doc.addImage(photo.src, 'JPEG', x, yPhoto, imageW, imageH);
       drawPdfSeal(doc, photo, x, yPhoto, imageW);
       doc.setFontSize(8);
@@ -234,7 +334,7 @@ function generatePdf() {
       }
       col++;
       if (col === cols) { col = 0; x = 12; yPhoto += imageH + footer + 5; }
-      else x = 112;
+      else x += imageW + 10;
     });
     if (col) { col = 0; x = 12; yPhoto += imageH + 18; }
     else yPhoto += 7;

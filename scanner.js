@@ -53,7 +53,7 @@ function renderPages(){
 }
 
 async function readImage(file){
-  if(!file||!file.type?.startsWith('image/'))throw new Error('Arquivo de imagem inválido.');
+  if(!file|| (file.type && !file.type.startsWith('image/')))throw new Error('Arquivo de imagem inválido.');
   if('createImageBitmap' in window){
     try{
       const bitmap=await createImageBitmap(file,{imageOrientation:'from-image',premultiplyAlpha:'none'});
@@ -68,7 +68,7 @@ async function readImage(file){
     img.src=url;
   });
 }
-function imageToCanvas(img,maxSide=2200){const w=img.width||img.naturalWidth,h=img.height||img.naturalHeight,s=Math.min(1,maxSide/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*s));c.height=Math.max(1,Math.round(h*s));const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);img.close?.();return c}
+function imageToCanvas(img,maxSide=1920){const w=img.width||img.naturalWidth,h=img.height||img.naturalHeight,s=Math.min(1,maxSide/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*s));c.height=Math.max(1,Math.round(h*s));const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);img.close?.();return c}
 function canvasData(c,q=.82){return c.toDataURL('image/jpeg',q)}
 async function imageDimensions(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve({width:img.naturalWidth,height:img.naturalHeight});img.onerror=()=>reject(new Error('Não foi possível ler a página salva.'));img.src=src})}
 async function rotateDataUrl90(src,clockwise=true){const dim=await imageDimensions(src);const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=src});const c=document.createElement('canvas');c.width=dim.height;c.height=dim.width;const ctx=c.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.translate(c.width/2,c.height/2);ctx.rotate((clockwise?1:-1)*Math.PI/2);ctx.drawImage(img,-dim.width/2,-dim.height/2);return c.toDataURL('image/jpeg',.82)}
@@ -203,7 +203,7 @@ async function confirmScan(){
   }catch(err){console.error('Blexo Scanner:',err);$('reviewStatus').textContent=`Não foi possível processar a imagem: ${err?.message||'erro desconhecido'}`;return false}
   finally{$('confirmScan').disabled=false}
 }
-async function addFiles(files){const list=[...files].filter(f=>f.type.startsWith('image/'));if(!list.length){$('feedback').textContent='Selecione uma imagem válida.';return}for(const f of list){await openReview(f);if(!pendingScan)continue;await new Promise(resolve=>{const onConfirm=async()=>{cleanup();await confirmScan();resolve()};const onCancel=()=>{cleanup();closeReviewModal();resolve()};const cleanup=()=>{$('confirmScan').removeEventListener('click',onConfirm);$('cancelScan').removeEventListener('click',onCancel);$('closeReview').removeEventListener('click',onCancel)};$('confirmScan').addEventListener('click',onConfirm);$('cancelScan').addEventListener('click',onCancel);$('closeReview').addEventListener('click',onCancel)})}}
+async function addFiles(files){const list=[...files].filter(f=>f&&(!f.type||f.type.startsWith('image/')));if(!list.length){$('feedback').textContent='Selecione uma imagem válida.';return}for(const f of list){$('feedback').textContent='Abrindo e preparando a foto…';await new Promise(r=>setTimeout(r,20));await openReview(f);if(!pendingScan)continue;await new Promise(resolve=>{const onConfirm=async()=>{cleanup();await confirmScan();resolve()};const onCancel=()=>{cleanup();closeReviewModal();resolve()};const cleanup=()=>{$('confirmScan').removeEventListener('click',onConfirm);$('cancelScan').removeEventListener('click',onCancel);$('closeReview').removeEventListener('click',onCancel)};$('confirmScan').addEventListener('click',onConfirm);$('cancelScan').addEventListener('click',onCancel);$('closeReview').addEventListener('click',onCancel)})}}
 function splitTextPdf(text,maxChars=90){
   const words=String(text||'').split(/\s+/); const lines=[]; let line='';
   for(const w of words){const test=line?line+' '+w:w;if(test.length>maxChars&&line){lines.push(line);line=w}else line=test} if(line)lines.push(line); return lines.length?lines:['—'];

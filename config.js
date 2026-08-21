@@ -1,7 +1,10 @@
-const BLEXO_CONFIG_KEY = 'blexo-suite-config-v3';
+const BLEXO_CONFIG_KEY = 'blexo-unificado-config-v2';
 const BLEXO_DEFAULT_CONFIG = {
   watermark: true,
   photoTemplate: 'two',
+  checkPhotoTemplate: 'two',
+  leituristaPhotoTemplate: 'two',
+  orcamentosPhotoTemplate: 'two',
   sealConfig: 'Antes|texto|#123047\nDepois|texto|#176d9a\nVerde|bolinha|#36a269\nAmarelo|bolinha|#e5b22e\nVermelho|bolinha|#cb4c4c',
   blockCount: 26,
   commonAreas: ['Salões 1', 'Salões 2', 'Academia', 'Sanepar'],
@@ -10,13 +13,21 @@ const BLEXO_DEFAULT_CONFIG = {
   checkHeaderColor: '#123047',
   leituristaHeaderColor: '#123047',
   scannerHeaderColor: '#123047',
+  rateioHeaderColor: '#123047',
+  orcamentosHeaderColor: '#123047',
+  orcamentosHeaderName: 'Blexo-Orçamento',
+  rateioHeaderName: 'Blexo-Rateio',
+  tagPedestreValue: 15,
+  tagVeiculoValue: 30,
+  mudancaEntradaValue: 180,
+  mudancaSaidaValue: 180,
   checkHeaderName: 'Blexo-Check',
-  leituristaHeaderName: 'Blexo-Check',
-  scannerHeaderName: 'Blexo-Check',
+  leituristaHeaderName: 'Blexo-Leiturista',
+  scannerHeaderName: 'Blexo-Scanner',
+  rateioHeaderName: 'Blexo-Rateio',
   checkHeaderIcon: '✓',
   leituristaHeaderIcon: 'L',
-  scannerHeaderIcon: 'S',
-  budgetHeaderColor: '#123047', budgetHeaderName: 'Blexo Suite', budgetHeaderIcon: 'R', googleClientId: '212427726646-vmf3c5qfmfvln3agbrtk8mo25iogs9o9.apps.googleusercontent.com', googleDriveFolder: 'Blexo Suite'
+  scannerHeaderIcon: 'S'
 };
 function blexoConfig() {
   try {

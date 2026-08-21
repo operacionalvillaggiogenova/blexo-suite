@@ -11,3 +11,17 @@
 .tool-link{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 
 .settings-section-title{font-size:13px;font-weight:800;color:#34454f;margin:18px 0 10px;padding-top:12px;border-top:1px solid var(--line)}.settings input[type="color"]{height:42px;padding:4px;cursor:pointer}
+
+/* V29 — listas padronizadas de relatórios */
+.report-name-grid{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:12px;align-items:end}
+.saved-records-list,#reportsList{display:grid;gap:10px}
+.saved-record{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch;border:1px solid #d8e2e7;border-radius:12px;background:#fff;overflow:hidden}
+.saved-record-main{appearance:none;border:0;background:transparent;text-align:left;padding:12px 14px;cursor:pointer;color:inherit;display:grid;gap:3px;min-width:0}
+.saved-record-main:hover{background:#f7fafb}
+.saved-record-main strong{font-size:15px;line-height:1.25;color:#2b3f4e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.record-type{font-size:12px;font-weight:800;color:#176d9a;text-transform:uppercase;letter-spacing:.05em}
+.saved-record-main small{color:#63737d;font-size:12px}
+.record-updated{opacity:.85}
+.saved-record .report-delete{border:0;border-left:1px solid #e2e8eb;background:#fff;color:#a54444;width:44px;font-size:20px;cursor:pointer}
+.saved-record .report-delete:hover{background:#fff5f5}
+@media(max-width:620px){.report-name-grid{grid-template-columns:1fr}.saved-record-main{padding:12px}.saved-record-main strong{white-space:normal}}
