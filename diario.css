@@ -3,3 +3,5 @@
 .summary-wrap{overflow-x:auto;margin-top:10px}.summary-table{width:100%;border-collapse:collapse;font-size:13px}.summary-table th,.summary-table td{padding:9px 8px;border-bottom:1px solid #e3e8ed;text-align:left;white-space:nowrap}.summary-table th{color:#526270;font-size:11px;text-transform:uppercase}.summary-table td:first-child{white-space:normal;min-width:130px}.day-summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.day-summary span{background:#f3f6f8;border-radius:9px;padding:8px 10px;font-size:12px}.summary-muted{color:#71808c;text-align:center;padding:14px}.service-duration{font-size:12px;color:#526270;margin:4px 0 8px}
 
 .photo-source{line-height:1.35;margin:2px 0 5px}.photo-source.verified{color:#23733b}.photo-source.unverified{color:#8a5b00}.photo-source.verified::before{content:'● ';}.photo-source.unverified::before{content:'○ ';}
+
+#savedReportsList{display:grid;gap:10px}.saved-report{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px;border:1px solid #d6e0e7;border-radius:14px;background:#fff}.saved-report button{white-space:nowrap}.saved-report small{display:block;color:#687784;margin-top:4px}
