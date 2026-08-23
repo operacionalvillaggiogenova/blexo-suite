@@ -8,27 +8,40 @@ function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt
 function newId(){return 'rateio-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)}
 function openDatabase(){
  return new Promise((resolve,reject)=>{
-  const r=indexedDB.open(DB_NAME,2);
+  const r=indexedDB.open(DB_NAME,3);
   r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:'id'})};
   r.onsuccess=()=>resolve(r.result);
   r.onerror=()=>reject(r.error||new Error('Não foi possível abrir o banco local.'));
   r.onblocked=()=>reject(new Error('O armazenamento local está bloqueado por outra janela do aplicativo.'));
  })
 }
-function requestResult(request,db){
- return new Promise((resolve,reject)=>{
-  request.onsuccess=()=>{const value=request.result;db.close();resolve(value)};
-  request.onerror=()=>{const error=request.error||new Error('Falha no armazenamento local.');db.close();reject(error)};
- })
+function runStore(mode,action){
+ return openDatabase().then(db=>new Promise((resolve,reject)=>{
+  let value;
+  let tx;
+  try{
+   tx=db.transaction(STORE,mode);
+   const request=action(tx.objectStore(STORE));
+   request.onsuccess=()=>{value=request.result};
+   request.onerror=()=>{};
+  }catch(error){db.close();reject(error);return}
+  tx.oncomplete=()=>{db.close();resolve(value)};
+  tx.onerror=()=>{const error=tx.error||new Error('Falha no armazenamento local.');db.close();reject(error)};
+  tx.onabort=()=>{const error=tx.error||new Error('Operação local cancelada.');db.close();reject(error)};
+ }))
 }
-async function saveRecord(record){const db=await openDatabase();return requestResult(db.transaction(STORE,'readwrite').objectStore(STORE).put(record),db)}
-async function getRecord(id){const db=await openDatabase();return requestResult(db.transaction(STORE,'readonly').objectStore(STORE).get(id),db)}
-async function deleteRecord(id){const db=await openDatabase();return requestResult(db.transaction(STORE,'readwrite').objectStore(STORE).delete(id),db)}
-async function getAllRecords(){const db=await openDatabase();return requestResult(db.transaction(STORE,'readonly').objectStore(STORE).getAll(),db).then(v=>Array.isArray(v)?v:[])}
+const saveRecord=record=>runStore('readwrite',store=>store.put(record));
+const getRecord=id=>runStore('readonly',store=>store.get(id));
+const deleteRecord=id=>runStore('readwrite',store=>store.delete(id));
+const getAllRecords=async()=>{
+ const value=await runStore('readonly',store=>store.getAll());
+ return Array.isArray(value)?value:[];
+};
+function asArray(value){return Array.isArray(value)?value:[]}
 
 function compareNatural(a,b){return String(a??'').localeCompare(String(b??''),'pt-BR',{numeric:true,sensitivity:'base'})}
 function compareEntries(a,b){const byBlock=compareNatural(a.block,b.block);if(byBlock)return byBlock;const byApartment=compareNatural(a.apartment,b.apartment);if(byApartment)return byApartment;return compareNatural(a.date,b.date)}
-function sortEntries(){tags.sort(compareEntries);changes.sort(compareEntries)}
+function sortEntries(){tags=asArray(tags).sort(compareEntries);changes=asArray(changes).sort(compareEntries)}
 
 function currentPayload(){
  sortEntries();
@@ -41,7 +54,7 @@ async function saveCurrent(manual=false){
  if(!r.createdAt){const old=currentDraftId?await getRecord(currentDraftId):null;r.createdAt=old?.createdAt||r.updatedAt}
  await saveRecord(r);
  currentDraftId=r.id;
- if(manual){try{await renderDrafts()}catch(e){console.warn('Rascunho salvo, mas a lista não pôde ser atualizada.',e)}}
+ 
  $('feedback').textContent=manual?'✓ Rascunho salvo.':'Salvo neste aparelho';
  return r;
 }
@@ -49,7 +62,7 @@ function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveCur
 function rateioTypeLabel(value){return value==='mudancas'?'🚚 Taxa de Mudança':'🏷️ Rateio Tags'}
 function recordQuantity(r){const entries=r.type==='tags'?(r.tags||[]):(r.changes||[]);const docs=(r.scans||[]).length;return `${entries.length} ${entries.length===1?'lançamento':'lançamentos'}${docs?` · ${docs} ${docs===1?'documento':'documentos'}`:''}`}
 async function renderDrafts(){
- const all=(await getAllRecords()).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
+ const all=asArray(await getAllRecords());all.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
  $('draftsList').innerHTML=all.length?all.map(r=>{const date=r.reportDate?new Date(r.reportDate+'T12:00:00').toLocaleDateString('pt-BR'):'Sem data';return `<div class="saved-record"><button class="saved-record-main" data-load-draft="${r.id}"><span class="record-type">${rateioTypeLabel(r.type)}</span><strong>${esc(r.title)}</strong><small>📅 ${date} · ${recordQuantity(r)}</small><small class="record-updated">Atualizado ${new Date(r.updatedAt).toLocaleString('pt-BR')}</small></button><button class="report-delete" data-delete-draft="${r.id}" aria-label="Excluir relatório">×</button></div>`}).join(''):'<p class="dialog-hint">Nenhum relatório salvo.</p>';
 }
 function render(){
@@ -97,7 +110,7 @@ async function generateRateioPdf(){
  if(!entries.length)throw new Error('Adicione pelo menos um lançamento.');
  sortEntries();
  await saveCurrent(false);
- const ordered=(type==='tags'?tags:changes).slice().sort(compareEntries);
+ const ordered=asArray(type==='tags'?tags:changes).slice();ordered.sort(compareEntries);
  const heads=type==='tags'?['Bloco','Apartamento','Tipo de Tag','Quantidade','Valor']:['Bloco','Apartamento','Data da mudança','Tipo','Valor'];
  const rows=ordered.map(x=>type==='tags'
   ? [x.block,x.apartment,x.type==='pedestre'?'Pedestre':'Veículo',x.qty,money(Number(x.qty||0)*(x.type==='pedestre'?c.tagPedestreValue:c.tagVeiculoValue))]
@@ -144,4 +157,4 @@ async function generateRateioPdf(){
 }
 $('generateButton').onclick=async()=>{const button=$('generateButton');button.disabled=true;$('feedback').textContent='Gerando PDF…';try{$('feedback').textContent=await generateRateioPdf()}catch(e){console.error('Blexo Rateios PDF:',e);$('feedback').textContent=`Falha ao gerar PDF: ${e?.message||'erro desconhecido'}`}finally{button.disabled=false}};
 window.addEventListener('online',()=>$('offlineStatus').textContent='● Online');window.addEventListener('offline',()=>$('offlineStatus').textContent='● Offline');
-(async()=>{const all=(await getAllRecords()).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));const last=all[0];if(last)await loadDraft(last.id);else resetDraft('tags')})().catch(e=>{console.error(e);resetDraft('tags')});
+(async()=>{const all=asArray(await getAllRecords());all.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));const last=all[0];if(last)await loadDraft(last.id);else resetDraft('tags')})().catch(e=>{console.error(e);resetDraft('tags')});
