@@ -1,4 +1,4 @@
-# Blexo-Check Unificado v9
+# Blexo-Suite
 
 Correções do scanner:
 - A4 como formato padrão.

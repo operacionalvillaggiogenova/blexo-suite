@@ -222,7 +222,7 @@ function buildPdf(pages){
     content.push('q');
     const hc=parseHeaderColor(typeof blexoConfig==='function'?(blexoConfig().scannerHeaderColor||'#123047'):'#123047');
     content.push(`${(hc[0]/255).toFixed(4)} ${(hc[1]/255).toFixed(4)} ${(hc[2]/255).toFixed(4)} rg 0 ${H-51.02} ${W} 51.02 re f`);
-    content.push('BT /F1 40 Tf 1 1 1 rg 28.35 '+(H-34)+' Td ('+pdfEscape(typeof blexoConfig==='function'?(blexoConfig().scannerHeaderName||'Blexo-Check'):'Blexo-Check')+') Tj ET');
+    content.push('BT /F1 40 Tf 1 1 1 rg 28.35 '+(H-34)+' Td ('+pdfEscape(typeof blexoConfig==='function'?(blexoConfig().scannerHeaderName||'Blexo-Scanner'):'Blexo-Scanner')+') Tj ET');
     let top=H-75; const identification=i===0?pages.identification:[]; if(i===0&&pages.documentTitle){content.push('BT /F1 28 Tf 0.16 0.20 0.23 rg 28.35 '+top+' Td ('+pdfEscape(pages.documentTitle)+') Tj ET');top-=24}
     if(i===0&&identification.length){for(const [label,value] of identification){content.push('BT /F1 24 Tf 0.16 0.20 0.23 rg 28.35 '+top+' Td ('+pdfEscape(label+': '+value)+') Tj ET');top-=18}}
     const left=28.35,right=28.35,bottom=28.35,availableW=W-left-right,availableH=top-bottom;
@@ -259,7 +259,7 @@ async function generatePdf(){
     prepared.documentTitle=title; prepared.identification=[['Apresentação',currentDocument.reference],['Empresa / condomínio',currentDocument.company],['Responsável',currentDocument.responsible]].filter(([,v])=>String(v||'').trim()).map(([a,b])=>[a,String(b)]);
     lastPdfName=`blexo-documento-${title.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||'digitalizado'}.pdf`;
     if(currentDocument.notes&&String(currentDocument.notes).trim()){
-      const notesPage={src:makeNotesPageDataUrl(currentDocument.notes,title,cfg.scannerHeaderColor||'#123047',cfg.scannerHeaderName||'Blexo-Check'),orientation:'portrait',title:''};
+      const notesPage={src:makeNotesPageDataUrl(currentDocument.notes,title,cfg.scannerHeaderColor||'#123047',cfg.scannerHeaderName||'Blexo-Scanner'),orientation:'portrait',title:''};
       prepared.push(notesPage);
     }
     lastPdfBlob=buildPdf(prepared); try{lastPdfFile=new File([lastPdfBlob],lastPdfName,{type:'application/pdf'})}catch{lastPdfFile=null}
@@ -270,7 +270,7 @@ async function generatePdf(){
 function makeNotesPageDataUrl(notes,title,color,name){const c=document.createElement('canvas');c.width=1240;c.height=1754;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.fillStyle=color;x.fillRect(0,0,c.width,120);x.fillStyle='#fff';x.font='bold 32px Arial';x.fillText(name,60,78);x.fillStyle='#1e2e38';x.font='bold 28px Arial';x.fillText('Observações finais',60,190);x.font='24px Arial';let y=240;for(const line of String(notes).split(/\r?\n/)){x.fillText(line.slice(0,75),60,y);y+=36}return c.toDataURL('image/jpeg',.88)}
 async function sharePdf(){
   if(!lastPdfBlob){$('feedback').textContent='Gere o PDF antes de enviá-lo.';return}
-  const subject=currentDocument.name||'Relatório Blexo-Check'; const details=[];if(currentDocument.company)details.push(currentDocument.company);if(currentDocument.responsible)details.push(`Responsável: ${currentDocument.responsible}`);const text=`Segue o documento “${subject}”.${details.length?'\n'+details.join('\n'):''}`;
+  const subject=currentDocument.name||'Relatório Blexo-Scanner'; const details=[];if(currentDocument.company)details.push(currentDocument.company);if(currentDocument.responsible)details.push(`Responsável: ${currentDocument.responsible}`);const text=`Segue o documento “${subject}”.${details.length?'\n'+details.join('\n'):''}`;
   try{if(lastPdfFile&&navigator.share&&(!navigator.canShare||navigator.canShare({files:[lastPdfFile]}))){await navigator.share({files:[lastPdfFile],title:subject,text});$('feedback').textContent='Compartilhamento aberto.';return} downloadPdf(); const mailto=`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text+'\n\nO PDF foi salvo no aparelho. Anexe o arquivo '+lastPdfName+' a esta mensagem.')}`;window.location.href=mailto;}catch(err){if(err?.name==='AbortError'){$('feedback').textContent='Compartilhamento cancelado.';return}console.error(err);$('feedback').textContent=`Não foi possível compartilhar: ${err?.message||'erro desconhecido'}`}}
 ['documentName','company','reference','responsible','notes'].forEach(id=>$(id).addEventListener('input',()=>{syncFields();scheduleSave()}));
 $('cameraInput').addEventListener('change',e=>{const files=e.target.files;addFiles(files).catch(err=>{$('feedback').textContent=`Não foi possível abrir a foto: ${err?.message||'erro desconhecido'}`});e.target.value=''});

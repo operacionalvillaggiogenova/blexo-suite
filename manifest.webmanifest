@@ -1,6 +1,6 @@
 {
-  "name": "Blexo Check",
-  "short_name": "Blexo",
+  "name": "Blexo-Suite",
+  "short_name": "Blexo-Suite",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f4f7f8",

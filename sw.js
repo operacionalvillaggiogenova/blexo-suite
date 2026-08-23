@@ -1,4 +1,4 @@
-const CACHE='blexo-unificado-v35-check-blob-fix';
+const CACHE='blexo-suite-v36-branding';
 const ASSETS=['./','./index.html','./check.html','./leiturista.html','./scanner.html','./rateios.html','./orcamentos.html','./dashboard.css','./dashboard.js','./config.js','./styles.css','./observation-size.css','./photo-notes.css','./seals.css','./app.js?v=18','./check-app.js?v=23','./offline-pdf.js?v=5','./scanner.css','./rateios.css','./rateios.js?v=5','./orcamentos.css','./orcamentos.js?v=3','./favicon.png','./apple-touch-icon.png','./icon-512.png','./icon-192.png','./scanner.js?v=22','./manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
