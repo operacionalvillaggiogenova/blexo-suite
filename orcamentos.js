@@ -19,32 +19,9 @@ function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt
 $('items').oninput=e=>{let i=current.items.find(x=>x.id==e.target.dataset.id);if(!i)return;if(e.target.classList.contains('d'))i.d=e.target.value;if(e.target.classList.contains('q'))i.q=+e.target.value;if(e.target.classList.contains('v'))i.v=+e.target.value;calc();scheduleSave()};
 $('items').onclick=e=>{if(e.target.dataset.x){current.items=current.items.filter(i=>i.id!=e.target.dataset.x);items();calc();scheduleSave()}};
 function calc(){sync();$('total').textContent=money(total())}
-async function readPhoto(file){
-  if(!file) throw new Error('Nenhuma imagem selecionada.');
-  let source=null;
-  try{
-    if('createImageBitmap' in window){
-      try{source=await createImageBitmap(file,{imageOrientation:'from-image',premultiplyAlpha:'none'});}catch(_){source=null;}
-    }
-    if(!source){
-      const url=URL.createObjectURL(file);
-      const image=new Image(); image.decoding='async'; image.src=url;
-      try{ if(image.decode) await image.decode(); else await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;}); }
-      finally{ URL.revokeObjectURL(url); }
-      source=image;
-    }
-    const sw=source.width||source.naturalWidth,sh=source.height||source.naturalHeight;
-    if(!sw||!sh) throw new Error('Imagem sem dimensões válidas.');
-    const max=1600,scale=Math.min(1,max/Math.max(sw,sh));
-    const w=Math.max(1,Math.round(sw*scale)),h=Math.max(1,Math.round(sh*scale));
-    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
-    const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(source,0,0,w,h);
-    source.close?.();
-    return canvas.toDataURL('image/jpeg',.88);
-  }catch(err){ source?.close?.(); throw new Error(err?.message||'Não foi possível processar a imagem selecionada.'); }
-}
-function groups(){$('groups').innerHTML=current.groups.map(g=>`<div class="group"><input class="gt" data-g="${g.id}" value="${esc(g.title)}" placeholder="Título do bloco"><div class="photos">${g.photos.map(p=>`<div class="photo"><img src="${p.src}"><button class="x" type="button" data-g="${g.id}" data-p="${p.id}">×</button><textarea data-g="${g.id}" data-p="${p.id}" placeholder="Observação da evidência">${esc(p.note||'')}</textarea></div>`).join('')}<div class="capture-actions"><label class="addphoto">📷 Fotografar<input class="files" data-g="${g.id}" data-source="camera" type="file" accept="image/*" capture="environment" multiple></label><label class="addphoto">▧ Galeria<input class="files" data-g="${g.id}" data-source="gallery" type="file" accept="image/*" multiple></label></div></div></div>`).join('')}
-$('groups').onchange=async e=>{if(!e.target.classList.contains('files'))return;let g=current.groups.find(x=>x.id==e.target.dataset.g);if(!g)return;let files=[...e.target.files];if(!files.length)return;try{for(let n=0;n<files.length;n++){ $('feedback').textContent=`Processando foto ${n+1} de ${files.length}…`;let src=await readPhoto(files[n]);g.photos.push({id:id(),src,note:''});}e.target.value='';groups();await put(current);$('feedback').textContent='✓ Foto(s) adicionada(s) e salva(s).';}catch(err){console.error(err);$('feedback').textContent=`Não foi possível processar a imagem: ${err?.message||'erro desconhecido'}`;e.target.value='';}};
+async function readPhoto(f){return new Promise((resolve,reject)=>{let r=new FileReader();r.onerror=()=>reject(r.error);r.onload=()=>{let im=new Image();im.onerror=()=>reject(new Error('Imagem inválida'));im.onload=()=>{try{let max=1600,s=Math.min(1,max/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height)),w=Math.max(1,Math.round((im.naturalWidth||im.width)*s)),h=Math.max(1,Math.round((im.naturalHeight||im.height)*s));let c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{alpha:false}).drawImage(im,0,0,w,h);resolve(c.toDataURL('image/jpeg',.85))}catch(e){reject(e)}};im.src=r.result};r.readAsDataURL(f)})}
+function groups(){$('groups').innerHTML=current.groups.map(g=>`<div class="group"><input class="gt" data-g="${g.id}" value="${esc(g.title)}" placeholder="Título do bloco"><div class="photos">${g.photos.map(p=>`<div class="photo"><img src="${p.src}"><button class="x" type="button" data-g="${g.id}" data-p="${p.id}">×</button><textarea data-g="${g.id}" data-p="${p.id}" placeholder="Observação da evidência">${esc(p.note||'')}</textarea></div>`).join('')}<label class="addphoto">📷 Fotografar ou adicionar fotos<input class="files" data-g="${g.id}" type="file" accept="image/*" multiple capture="environment"></label></div></div>`).join('')}
+$('groups').onchange=async e=>{if(!e.target.classList.contains('files'))return;let g=current.groups.find(x=>x.id==e.target.dataset.g);if(!g)return;let files=[...e.target.files];for(let n=0;n<files.length;n++){try{$('feedback').textContent=`Processando foto ${n+1} de ${files.length}…`;let src=await readPhoto(files[n]);g.photos.push({id:id(),src,note:''})}catch(err){console.error(err);alert('Não foi possível processar uma das fotos.')} }e.target.value='';groups();await put(current);$('feedback').textContent='✓ Foto(s) adicionada(s) e salva(s).'};
 $('groups').oninput=e=>{if(e.target.classList.contains('gt')){let g=current.groups.find(g=>g.id==e.target.dataset.g);if(g)g.title=e.target.value}else if(e.target.dataset.p){let g=current.groups.find(g=>g.id==e.target.dataset.g),p=g?.photos.find(p=>p.id==e.target.dataset.p);if(p)p.note=e.target.value}scheduleSave()};
 $('groups').onclick=e=>{if(e.target.dataset.p){let g=current.groups.find(g=>g.id==e.target.dataset.g);g.photos=g.photos.filter(p=>p.id!=e.target.dataset.p);groups();scheduleSave()}};
 $('addItem').onclick=()=>{current.items.push({id:id(),d:'',q:1,v:0});items();scheduleSave()};
