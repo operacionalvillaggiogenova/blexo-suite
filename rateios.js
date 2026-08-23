@@ -6,21 +6,25 @@ function cfg(){return typeof blexoConfig==='function'?blexoConfig():BLEXO_DEFAUL
 function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
 function newId(){return 'rateio-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)}
-function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE,{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-async function withStore(mode,fn){
- const db=await openDatabase();
+function openDatabase(){
  return new Promise((resolve,reject)=>{
-  const tx=db.transaction(STORE,mode),store=tx.objectStore(STORE);let result;
-  try{result=fn(store)}catch(e){db.close();reject(e);return}
-  tx.oncomplete=()=>{const value=result&&typeof result==='object'&&'result' in result?result.result:result;db.close();resolve(value)};
-  tx.onerror=()=>{db.close();reject(tx.error)};
-  tx.onabort=()=>{db.close();reject(tx.error)};
+  const r=indexedDB.open(DB_NAME,2);
+  r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:'id'})};
+  r.onsuccess=()=>resolve(r.result);
+  r.onerror=()=>reject(r.error||new Error('Não foi possível abrir o banco local.'));
+  r.onblocked=()=>reject(new Error('O armazenamento local está bloqueado por outra janela do aplicativo.'));
  })
 }
-const saveRecord=r=>withStore('readwrite',s=>s.put(r));
-const getRecord=id=>withStore('readonly',s=>s.get(id));
-const deleteRecord=id=>withStore('readwrite',s=>s.delete(id));
-const getAllRecords=()=>withStore('readonly',s=>s.getAll());
+function requestResult(request,db){
+ return new Promise((resolve,reject)=>{
+  request.onsuccess=()=>{const value=request.result;db.close();resolve(value)};
+  request.onerror=()=>{const error=request.error||new Error('Falha no armazenamento local.');db.close();reject(error)};
+ })
+}
+async function saveRecord(record){const db=await openDatabase();return requestResult(db.transaction(STORE,'readwrite').objectStore(STORE).put(record),db)}
+async function getRecord(id){const db=await openDatabase();return requestResult(db.transaction(STORE,'readonly').objectStore(STORE).get(id),db)}
+async function deleteRecord(id){const db=await openDatabase();return requestResult(db.transaction(STORE,'readwrite').objectStore(STORE).delete(id),db)}
+async function getAllRecords(){const db=await openDatabase();return requestResult(db.transaction(STORE,'readonly').objectStore(STORE).getAll(),db).then(v=>Array.isArray(v)?v:[])}
 
 function compareNatural(a,b){return String(a??'').localeCompare(String(b??''),'pt-BR',{numeric:true,sensitivity:'base'})}
 function compareEntries(a,b){const byBlock=compareNatural(a.block,b.block);if(byBlock)return byBlock;const byApartment=compareNatural(a.apartment,b.apartment);if(byApartment)return byApartment;return compareNatural(a.date,b.date)}
@@ -33,9 +37,13 @@ function currentPayload(){
  updatedAt:new Date().toISOString(),createdAt:null};
 }
 async function saveCurrent(manual=false){
- const r=currentPayload(); if(!r.createdAt){const old=currentDraftId&&await getRecord(currentDraftId);r.createdAt=old?.createdAt||r.updatedAt}
- currentDraftId=r.id; await saveRecord(r); await renderDrafts();
+ const r=currentPayload();
+ if(!r.createdAt){const old=currentDraftId?await getRecord(currentDraftId):null;r.createdAt=old?.createdAt||r.updatedAt}
+ await saveRecord(r);
+ currentDraftId=r.id;
+ if(manual){try{await renderDrafts()}catch(e){console.warn('Rascunho salvo, mas a lista não pôde ser atualizada.',e)}}
  $('feedback').textContent=manual?'✓ Rascunho salvo.':'Salvo neste aparelho';
+ return r;
 }
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveCurrent(false).catch(console.error),500)}
 function rateioTypeLabel(value){return value==='mudancas'?'🚚 Taxa de Mudança':'🏷️ Rateio Tags'}
@@ -62,7 +70,7 @@ async function loadDraft(id){
  $('reportTitle').value=r.title|| (type==='tags'?'Rateio Tags':'Taxa de Mudança');$('reportDate').value=r.reportDate||today;render();$('feedback').textContent='✓ Rascunho aberto para edição.';
 }
 document.querySelectorAll('.rateio-type').forEach(b=>b.onclick=async()=>{if(type!==b.dataset.type){type=b.dataset.type;currentDraftId=null;tags=[];changes=[];scans=[];$('reportTitle').value=type==='tags'?'Rateio Tags':'Taxa de Mudança';render();}});
-$('saveDraftButton').onclick=()=>saveCurrent(true).catch(e=>{console.error(e);alert('Não foi possível salvar o rascunho.')}); $('viewDraftsButton').onclick=async()=>{await renderDrafts();$('draftsDialog').showModal()}; $('closeDraftsButton').onclick=()=>$('draftsDialog').close();
+$('saveDraftButton').onclick=()=>saveCurrent(true).catch(e=>{console.error(e);alert('Não foi possível salvar o rascunho: '+(e?.message||e))}); $('viewDraftsButton').onclick=async()=>{try{await renderDrafts();$('draftsDialog').showModal()}catch(e){console.error(e);alert('Não foi possível abrir os rascunhos: '+(e?.message||e))}}; $('closeDraftsButton').onclick=()=>$('draftsDialog').close();
 $('newDraftButton').onclick=()=>{if((tags.length||changes.length||scans.length)&&!confirm('Criar um novo rascunho? O atual continuará salvo.'))return;resetDraft(type);$('feedback').textContent='Novo rascunho criado.'};
 $('addTag').onclick=()=>{let block=$('tagBlock').value.trim(),ap=$('tagApartment').value.trim(),qty=Number($('tagQty').value);if(!block||!ap||!qty)return alert('Informe bloco, apartamento e quantidade.');tags.push({block,apartment:ap,type:$('tagType').value,qty});sortEntries();$('tagBlock').value='';$('tagApartment').value='';$('tagQty').value=1;render();scheduleSave()};
 $('addChange').onclick=()=>{let block=$('changeBlock').value.trim(),ap=$('changeApartment').value.trim(),date=$('changeDate').value;if(!block||!ap||!date)return alert('Informe bloco, apartamento e data.');changes.push({block,apartment:ap,date,type:$('changeType').value});sortEntries();$('changeBlock').value='';$('changeApartment').value='';render();scheduleSave()};
