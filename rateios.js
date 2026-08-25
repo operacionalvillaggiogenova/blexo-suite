@@ -1,160 +1,50 @@
 const $=id=>document.getElementById(id);
 const DB_NAME='blexo-rateios-db', STORE='drafts';
-let type='tags', tags=[], changes=[], scans=[], currentDraftId=null, saveTimer=null;
+let type='tags', tags=[], changes=[], refunds=[], refundItems=[], scans=[], currentDraftId=null, saveTimer=null;
 const today=new Date().toISOString().slice(0,10);
-function cfg(){return typeof blexoConfig==='function'?blexoConfig():BLEXO_DEFAULT_CONFIG}
-function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
-function esc(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
-function newId(){return 'rateio-'+Date.now()+'-'+Math.random().toString(36).slice(2,9)}
-function openDatabase(){
- return new Promise((resolve,reject)=>{
-  const r=indexedDB.open(DB_NAME,3);
-  r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:'id'})};
-  r.onsuccess=()=>resolve(r.result);
-  r.onerror=()=>reject(r.error||new Error('Não foi possível abrir o banco local.'));
-  r.onblocked=()=>reject(new Error('O armazenamento local está bloqueado por outra janela do aplicativo.'));
- })
-}
-function runStore(mode,action){
- return openDatabase().then(db=>new Promise((resolve,reject)=>{
-  let value;
-  let tx;
-  try{
-   tx=db.transaction(STORE,mode);
-   const request=action(tx.objectStore(STORE));
-   request.onsuccess=()=>{value=request.result};
-   request.onerror=()=>{};
-  }catch(error){db.close();reject(error);return}
-  tx.oncomplete=()=>{db.close();resolve(value)};
-  tx.onerror=()=>{const error=tx.error||new Error('Falha no armazenamento local.');db.close();reject(error)};
-  tx.onabort=()=>{const error=tx.error||new Error('Operação local cancelada.');db.close();reject(error)};
- }))
-}
-const saveRecord=record=>runStore('readwrite',store=>store.put(record));
-const getRecord=id=>runStore('readonly',store=>store.get(id));
-const deleteRecord=id=>runStore('readwrite',store=>store.delete(id));
-const getAllRecords=async()=>{
- const value=await runStore('readonly',store=>store.getAll());
- return Array.isArray(value)?value:[];
-};
-function asArray(value){return Array.isArray(value)?value:[]}
-
+const cfg=()=>typeof blexoConfig==='function'?blexoConfig():BLEXO_DEFAULT_CONFIG;
+const money=v=>Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const esc=v=>String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const newId=()=>`rateio-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
+const asArray=v=>Array.isArray(v)?v:[];
+function openDatabase(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB_NAME,3);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE,{keyPath:'id'})};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error||new Error('Não foi possível abrir o banco local.'));r.onblocked=()=>reject(new Error('O armazenamento local está bloqueado.'))})}
+function runStore(mode,action){return openDatabase().then(db=>new Promise((resolve,reject)=>{let value,tx;try{tx=db.transaction(STORE,mode);const req=action(tx.objectStore(STORE));req.onsuccess=()=>value=req.result}catch(e){db.close();reject(e);return}tx.oncomplete=()=>{db.close();resolve(value)};tx.onerror=()=>{db.close();reject(tx.error||new Error('Falha no armazenamento local.'))}}))}
+const saveRecord=r=>runStore('readwrite',s=>s.put(r)),getRecord=id=>runStore('readonly',s=>s.get(id)),deleteRecord=id=>runStore('readwrite',s=>s.delete(id));
+const getAllRecords=async()=>asArray(await runStore('readonly',s=>s.getAll()));
 function compareNatural(a,b){return String(a??'').localeCompare(String(b??''),'pt-BR',{numeric:true,sensitivity:'base'})}
-function compareEntries(a,b){const byBlock=compareNatural(a.block,b.block);if(byBlock)return byBlock;const byApartment=compareNatural(a.apartment,b.apartment);if(byApartment)return byApartment;return compareNatural(a.date,b.date)}
-function sortEntries(){tags=asArray(tags).sort(compareEntries);changes=asArray(changes).sort(compareEntries)}
-
-function currentPayload(){
- sortEntries();
- return {id:currentDraftId||newId(),type,title:$('reportTitle').value.trim()||(type==='tags'?'Rateio Tags':'Taxa de Mudança'),
-  reportDate:$('reportDate').value||today,scanMode:document.querySelector('input[name="rateioScanMode"]:checked')?.value||'color',cleanLevel:Number($('rateioCleanLevel').value),tags:structuredClone(tags),changes:structuredClone(changes),scans:structuredClone(scans),
- updatedAt:new Date().toISOString(),createdAt:null};
-}
-async function saveCurrent(manual=false){
- const r=currentPayload();
- if(!r.createdAt){const old=currentDraftId?await getRecord(currentDraftId):null;r.createdAt=old?.createdAt||r.updatedAt}
- await saveRecord(r);
- currentDraftId=r.id;
- 
- $('feedback').textContent=manual?'✓ Rascunho salvo.':'Salvo neste aparelho';
- return r;
-}
+function compareEntries(a,b){return compareNatural(a.block,b.block)||compareNatural(a.apartment,b.apartment)||compareNatural(a.date,b.date)}
+function sortEntries(){tags=asArray(tags).sort(compareEntries);changes=asArray(changes).sort(compareEntries);refunds=asArray(refunds).sort(compareEntries)}
+function typeLabel(v){return v==='mudancas'?'🚚 Taxa de Mudança':v==='ressarcimentos'?'↩️ Ressarcimentos':'🏷️ Rateio Tags'}
+function defaultTitle(){return type==='tags'?'Rateio Tags':type==='mudancas'?'Taxa de Mudança':'Ressarcimentos'}
+function currentPayload(){sortEntries();return {id:currentDraftId||newId(),type,title:$('reportTitle').value.trim()||defaultTitle(),reportDate:$('reportDate').value||today,scanMode:document.querySelector('input[name="rateioScanMode"]:checked')?.value||'color',cleanLevel:Number($('rateioCleanLevel').value),tags:structuredClone(tags),changes:structuredClone(changes),refunds:structuredClone(refunds),scans:structuredClone(scans),updatedAt:new Date().toISOString(),createdAt:null}}
+async function saveCurrent(manual=false){const r=currentPayload();if(!r.createdAt){const old=currentDraftId?await getRecord(currentDraftId):null;r.createdAt=old?.createdAt||r.updatedAt}await saveRecord(r);currentDraftId=r.id;$('feedback').textContent=manual?'✓ Rascunho salvo.':'Salvo neste aparelho';return r}
 function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveCurrent(false).catch(console.error),500)}
-function rateioTypeLabel(value){return value==='mudancas'?'🚚 Taxa de Mudança':'🏷️ Rateio Tags'}
-function recordQuantity(r){const entries=r.type==='tags'?(r.tags||[]):(r.changes||[]);const docs=(r.scans||[]).length;return `${entries.length} ${entries.length===1?'lançamento':'lançamentos'}${docs?` · ${docs} ${docs===1?'documento':'documentos'}`:''}`}
-async function renderDrafts(){
- const all=asArray(await getAllRecords());all.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
- $('draftsList').innerHTML=all.length?all.map(r=>{const date=r.reportDate?new Date(r.reportDate+'T12:00:00').toLocaleDateString('pt-BR'):'Sem data';return `<div class="saved-record"><button class="saved-record-main" data-load-draft="${r.id}"><span class="record-type">${rateioTypeLabel(r.type)}</span><strong>${esc(r.title)}</strong><small>📅 ${date} · ${recordQuantity(r)}</small><small class="record-updated">Atualizado ${new Date(r.updatedAt).toLocaleString('pt-BR')}</small></button><button class="report-delete" data-delete-draft="${r.id}" aria-label="Excluir relatório">×</button></div>`}).join(''):'<p class="dialog-hint">Nenhum relatório salvo.</p>';
-}
-function render(){
- $('tagsForm').hidden=type!=='tags';$('changesForm').hidden=type!=='mudancas';
- document.querySelectorAll('.rateio-type').forEach(b=>b.classList.toggle('active',b.dataset.type===type));
- $('tagsTable').innerHTML=tags.length?`<table><thead><tr><th>Bloco</th><th>Apartamento</th><th>Tipo de Tag</th><th>Quantidade</th><th></th></tr></thead><tbody>${tags.map((x,i)=>`<tr><td>${esc(x.block)}</td><td>${esc(x.apartment)}</td><td>${x.type==='pedestre'?'Pedestre':'Veículo'}</td><td>${x.qty}</td><td><button class="remove-row" data-remove-tag="${i}">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Nenhum lançamento adicionado.</p>';
- $('changesTable').innerHTML=changes.length?`<table><thead><tr><th>Bloco</th><th>Apartamento</th><th>Data da mudança</th><th>Tipo</th><th></th></tr></thead><tbody>${changes.map((x,i)=>`<tr><td>${esc(x.block)}</td><td>${esc(x.apartment)}</td><td>${new Date(x.date+'T12:00:00').toLocaleDateString('pt-BR')}</td><td>${x.type==='entrada'?'Entrada':'Saída'}</td><td><button class="remove-row" data-remove-change="${i}">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Nenhum lançamento adicionado.</p>';
- $('scansList').innerHTML=scans.map((x,i)=>`<div class="scan-thumb"><img src="${x.src}"><span>${esc(x.name)}</span><button data-remove-scan="${i}">Remover</button></div>`).join('');
- $('scanCount').textContent=`${scans.length} documentos`;
-}
-function resetDraft(kind=type){
- type=kind; currentDraftId=null; tags=[];changes=[];scans=[];
- $('reportTitle').value=type==='tags'?'Rateio Tags':'Taxa de Mudança';$('reportDate').value=today;$('changeDate').value=today;render();
-}
-async function loadDraft(id){
- const r=await getRecord(id);if(!r)return;
-  type=r.type;currentDraftId=r.id;tags=Array.isArray(r.tags)?r.tags:[];changes=Array.isArray(r.changes)?r.changes:[];sortEntries();scans=Array.isArray(r.scans)?r.scans:[];const mode=document.querySelector(`input[name="rateioScanMode"][value="${r.scanMode||'color'}"]`);if(mode)mode.checked=true;$('rateioCleanLevel').value=r.cleanLevel??55;$('rateioCleanValue').textContent=`${$('rateioCleanLevel').value}%`;
- $('reportTitle').value=r.title|| (type==='tags'?'Rateio Tags':'Taxa de Mudança');$('reportDate').value=r.reportDate||today;render();$('feedback').textContent='✓ Rascunho aberto para edição.';
-}
-document.querySelectorAll('.rateio-type').forEach(b=>b.onclick=async()=>{if(type!==b.dataset.type){type=b.dataset.type;currentDraftId=null;tags=[];changes=[];scans=[];$('reportTitle').value=type==='tags'?'Rateio Tags':'Taxa de Mudança';render();}});
-$('saveDraftButton').onclick=()=>saveCurrent(true).catch(e=>{console.error(e);alert('Não foi possível salvar o rascunho: '+(e?.message||e))}); $('viewDraftsButton').onclick=async()=>{try{await renderDrafts();$('draftsDialog').showModal()}catch(e){console.error(e);alert('Não foi possível abrir os rascunhos: '+(e?.message||e))}}; $('closeDraftsButton').onclick=()=>$('draftsDialog').close();
-$('newDraftButton').onclick=()=>{if((tags.length||changes.length||scans.length)&&!confirm('Criar um novo rascunho? O atual continuará salvo.'))return;resetDraft(type);$('feedback').textContent='Novo rascunho criado.'};
-$('addTag').onclick=()=>{let block=$('tagBlock').value.trim(),ap=$('tagApartment').value.trim(),qty=Number($('tagQty').value);if(!block||!ap||!qty)return alert('Informe bloco, apartamento e quantidade.');tags.push({block,apartment:ap,type:$('tagType').value,qty});sortEntries();$('tagBlock').value='';$('tagApartment').value='';$('tagQty').value=1;render();scheduleSave()};
-$('addChange').onclick=()=>{let block=$('changeBlock').value.trim(),ap=$('changeApartment').value.trim(),date=$('changeDate').value;if(!block||!ap||!date)return alert('Informe bloco, apartamento e data.');changes.push({block,apartment:ap,date,type:$('changeType').value});sortEntries();$('changeBlock').value='';$('changeApartment').value='';render();scheduleSave()};
+function recordQuantity(r){const entries=r.type==='tags'?asArray(r.tags):r.type==='mudancas'?asArray(r.changes):asArray(r.refunds);return `${entries.length} ${entries.length===1?'lançamento':'lançamentos'}${asArray(r.scans).length?` · ${r.scans.length} evidências`:''}`}
+async function renderDrafts(){const all=await getAllRecords();all.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));$('draftsList').innerHTML=all.length?all.map(r=>{const d=r.reportDate?new Date(r.reportDate+'T12:00:00').toLocaleDateString('pt-BR'):'Sem data';return `<div class="saved-record"><button class="saved-record-main" data-load-draft="${r.id}"><span class="record-type">${typeLabel(r.type)}</span><strong>${esc(r.title)}</strong><small>📅 ${d} · ${recordQuantity(r)}</small></button><button class="delete-draft" data-delete-draft="${r.id}">Excluir</button></div>`}).join(''):'<p class="draft-empty">Nenhum relatório salvo.</p>'}
+function configuredItems(){const list=asArray(cfg().ressarcimentoItems).map(x=>({name:String(x?.name||'').trim(),value:Number(x?.value)||0})).filter(x=>x.name);return list.length?list:[{name:'Item não configurado',value:0}]}
+function renderRefundOptions(){const items=configuredItems(),sel=$('refundItemType'),current=sel.value;sel.innerHTML=items.map((x,i)=>`<option value="${i}">${esc(x.name)} — ${money(x.value)}</option>`).join('');if([...sel.options].some(o=>o.value===current))sel.value=current;updateRefundValue()}
+function updateRefundValue(){const item=configuredItems()[Number($('refundItemType').value)||0]||{value:0};$('refundItemValue').value=money(item.value)}
+function render(){sortEntries();$('tagsForm').hidden=type!=='tags';$('changesForm').hidden=type!=='mudancas';$('refundForm').hidden=type!=='ressarcimentos';document.querySelectorAll('.rateio-type').forEach(b=>b.classList.toggle('active',b.dataset.type===type));$('evidenceTitle').textContent=type==='ressarcimentos'?'Evidências da ocorrência':'Documentos digitalizados';$('evidenceHint').textContent=type==='ressarcimentos'?'Fotografe ou selecione as evidências relacionadas às ocorrências deste relatório. Elas serão exibidas no PDF final.':'Fotografe ou selecione os formulários. Eles serão exibidos abaixo da tabela no PDF final.';
+$('tagsTable').innerHTML=tags.length?`<table><thead><tr><th>Bloco</th><th>Apartamento</th><th>Tipo</th><th>Quantidade</th><th></th></tr></thead><tbody>${tags.map((x,i)=>`<tr><td>${esc(x.block)}</td><td>${esc(x.apartment)}</td><td>${x.type==='pedestre'?'Pedestre':'Veículo'}</td><td>${x.qty}</td><td><button class="remove-row" data-remove-tag="${i}">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Nenhum lançamento adicionado.</p>';
+$('changesTable').innerHTML=changes.length?`<table><thead><tr><th>Bloco</th><th>Apartamento</th><th>Data</th><th>Tipo</th><th></th></tr></thead><tbody>${changes.map((x,i)=>`<tr><td>${esc(x.block)}</td><td>${esc(x.apartment)}</td><td>${new Date(x.date+'T12:00:00').toLocaleDateString('pt-BR')}</td><td>${x.type==='entrada'?'Entrada':'Saída'}</td><td><button class="remove-row" data-remove-change="${i}">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Nenhum lançamento adicionado.</p>';
+$('refundItemsTable').innerHTML=refundItems.length?`<table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor unit.</th><th>Total</th><th></th></tr></thead><tbody>${refundItems.map((x,i)=>`<tr><td>${esc(x.name)}</td><td>${x.qty}</td><td>${money(x.value)}</td><td>${money(x.qty*x.value)}</td><td><button class="remove-row" data-remove-refund-item="${i}">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Adicione os itens relacionados à ocorrência.</p>';
+$('refundsTable').innerHTML=refunds.length?`<table><thead><tr><th>Bloco</th><th>Apartamento</th><th>Ocorrência</th><th>Itens</th><th>Total</th><th></th></tr></thead><tbody>${refunds.map((x,i)=>`<tr><td>${esc(x.block)}</td><td>${esc(x.apartment)}</td><td>${new Date(x.date+'T12:00:00').toLocaleDateString('pt-BR')}</td><td>${x.items.map(y=>esc(y.name)+' × '+y.qty).join('<br>')}</td><td>${money(x.items.reduce((s,y)=>s+Number(y.qty||0)*Number(y.value||0),0))}</td><td><button class="remove-row" data-remove-refund="${i}">×</button></td></tr>`).join('')}</tbody></table>`:'<p class="hint">Nenhum ressarcimento adicionado.</p>';
+$('scansList').innerHTML=scans.map((x,i)=>`<div class="scan-thumb"><img src="${x.src}"><span>${esc(x.name)}</span><button data-remove-scan="${i}">Remover</button></div>`).join('');$('scanCount').textContent=`${scans.length} ${type==='ressarcimentos'?'evidências':'documentos'}`;renderRefundOptions()}
+function resetDraft(kind=type){type=kind;currentDraftId=null;tags=[];changes=[];refunds=[];refundItems=[];scans=[];$('reportTitle').value=defaultTitle();$('reportDate').value=today;$('changeDate').value=today;$('refundDate').value=today;render()}
+async function loadDraft(id){const r=await getRecord(id);if(!r)return;type=['tags','mudancas','ressarcimentos'].includes(r.type)?r.type:'tags';currentDraftId=r.id;tags=asArray(r.tags);changes=asArray(r.changes);refunds=asArray(r.refunds);refundItems=[];scans=asArray(r.scans);const mode=document.querySelector(`input[name="rateioScanMode"][value="${r.scanMode||'color'}"]`);if(mode)mode.checked=true;$('rateioCleanLevel').value=r.cleanLevel??55;$('rateioCleanValue').textContent=`${$('rateioCleanLevel').value}%`;$('reportTitle').value=r.title||defaultTitle();$('reportDate').value=r.reportDate||today;render();$('feedback').textContent='✓ Rascunho aberto para edição.'}
+document.querySelectorAll('.rateio-type').forEach(b=>b.onclick=()=>{if(type!==b.dataset.type){type=b.dataset.type;currentDraftId=null;tags=[];changes=[];refunds=[];refundItems=[];scans=[];$('reportTitle').value=defaultTitle();render();}});
+$('saveDraftButton').onclick=()=>saveCurrent(true).catch(e=>alert('Não foi possível salvar: '+(e?.message||e)));$('viewDraftsButton').onclick=async()=>{await renderDrafts();$('draftsDialog').showModal()};$('closeDraftsButton').onclick=()=>$('draftsDialog').close();$('newDraftButton').onclick=()=>{if((tags.length||changes.length||refunds.length||scans.length)&&!confirm('Criar um novo rascunho? O atual continuará salvo.'))return;resetDraft(type);$('feedback').textContent='Novo rascunho criado.'};
+$('addTag').onclick=()=>{const block=$('tagBlock').value.trim(),ap=$('tagApartment').value.trim(),qty=Number($('tagQty').value);if(!block||!ap||!qty)return alert('Informe bloco, apartamento e quantidade.');tags.push({block,apartment:ap,type:$('tagType').value,qty});$('tagBlock').value='';$('tagApartment').value='';$('tagQty').value=1;render();scheduleSave()};
+$('addChange').onclick=()=>{const block=$('changeBlock').value.trim(),ap=$('changeApartment').value.trim(),date=$('changeDate').value;if(!block||!ap||!date)return alert('Informe bloco, apartamento e data.');changes.push({block,apartment:ap,date,type:$('changeType').value});$('changeBlock').value='';$('changeApartment').value='';render();scheduleSave()};
+$('refundItemType').onchange=updateRefundValue;$('addRefundItem').onclick=()=>{const item=configuredItems()[Number($('refundItemType').value)||0],qty=Number($('refundItemQty').value);if(!item||!qty)return alert('Selecione um item e informe a quantidade.');refundItems.push({name:item.name,value:Number(item.value)||0,qty});$('refundItemQty').value=1;render();scheduleSave()};
+$('addRefund').onclick=()=>{const block=$('refundBlock').value.trim(),ap=$('refundApartment').value.trim(),date=$('refundDate').value;if(!block||!ap||!date||!refundItems.length)return alert('Informe bloco, apartamento, data da ocorrência e pelo menos um item.');refunds.push({block,apartment:ap,date,items:structuredClone(refundItems)});refundItems=[];$('refundBlock').value='';$('refundApartment').value='';$('refundDate').value=today;render();scheduleSave()};
 ['reportTitle','reportDate'].forEach(id=>$(id).addEventListener('input',scheduleSave));
-document.addEventListener('click',async e=>{
- let i=e.target.dataset.removeTag;if(i!==undefined){tags.splice(i,1);render();scheduleSave();return}
- i=e.target.dataset.removeChange;if(i!==undefined){changes.splice(i,1);render();scheduleSave();return}
- i=e.target.dataset.removeScan;if(i!==undefined){scans.splice(i,1);render();scheduleSave();return}
- const load=e.target.dataset.loadDraft;if(load!==undefined){if((tags.length||changes.length||scans.length)&&!confirm('Abrir outro rascunho? O atual já está salvo automaticamente.'))return;await loadDraft(load);$('draftsDialog').close();return}
- const del=e.target.dataset.deleteDraft;if(del!==undefined){if(confirm('Excluir este rascunho?')){await deleteRecord(del);if(currentDraftId===del)resetDraft(type);await renderDrafts();}}
-});
-async function loadFiles(files){const mode=document.querySelector('input[name="rateioScanMode"]:checked')?.value||'color',level=Number($('rateioCleanLevel').value);for(const file of files){$('feedback').textContent='Processando documento…';try{const result=await fileToData(file,mode,level);scans.push({name:file.name||'Documento',src:result.src,mode:result.mode})}catch(e){console.error(e);alert('Não foi possível processar uma imagem.')}}$('feedback').textContent=scans.length?'✓ Documento(s) adicionado(s).':'';render();scheduleSave()}
-$('cameraInput').addEventListener('change',e=>{loadFiles(e.target.files);e.target.value=''});$('galleryInput').addEventListener('change',e=>{loadFiles(e.target.files);e.target.value=''});
-function processRateioCanvas(c,mode,level){if(mode==='color')return c;const ctx=c.getContext('2d'),d=ctx.getImageData(0,0,c.width,c.height),o=ctx.createImageData(c.width,c.height);for(let i=0;i<d.data.length;i+=4){const y=.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2];const v=mode==='gray'?Math.min(255,Math.max(0,(y-128)*(1.15+level*.003)+128)):(y<128-(level-50)*.55?0:255);o.data[i]=o.data[i+1]=o.data[i+2]=v;o.data[i+3]=255}ctx.putImageData(o,0,0);return c}
-function fileToData(file,mode='color',level=55){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(r.error);r.onload=()=>{const img=new Image();img.onerror=()=>reject(new Error('Imagem inválida'));img.onload=()=>{let w=img.naturalWidth,h=img.naturalHeight,max=1920;if(Math.max(w,h)>max){let k=max/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}let c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve({src:processRateioCanvas(c,mode,level).toDataURL('image/jpeg',.88),mode})};img.src=r.result};r.readAsDataURL(file)})}
-document.querySelectorAll('input[name="rateioScanMode"]').forEach(r=>r.addEventListener('change',()=>{scheduleSave();$('feedback').textContent='Modo de tratamento alterado para os próximos documentos.'}));
-$('rateioCleanLevel').addEventListener('input',()=>{$('rateioCleanValue').textContent=`${$('rateioCleanLevel').value}%`;scheduleSave()});
-function downloadBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
-function wrapText(ctx,text,maxWidth){const words=String(text??'').split(/\s+/);const lines=[];let line='';for(const word of words){const next=line?line+' '+word:word;if(ctx.measureText(next).width<=maxWidth||!line)line=next;else{lines.push(line);line=word}}if(line)lines.push(line);return lines}
-async function imageToPage(src,title){const img=new Image();await new Promise((ok,no)=>{img.onload=ok;img.onerror=no;img.src=src});const canvas=document.createElement('canvas');canvas.width=1240;canvas.height=1754;const g=canvas.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,1240,1754);g.fillStyle='#1e2e38';g.font='bold 24px Arial';g.fillText(title,60,70);const scale=Math.min(1120/img.naturalWidth,1500/img.naturalHeight);const w=img.naturalWidth*scale,h=img.naturalHeight*scale;g.drawImage(img,60+(1120-w)/2,110,w,h);return canvas.toDataURL('image/jpeg',.9)}
-async function rateioOfflinePdf(c,rows,heads,total){if(!window.BlexoOfflinePdf)throw new Error('Gerador offline de PDF indisponível. Reabra o aplicativo para atualizar os arquivos.');const pages=[];const make=()=>{const x=document.createElement('canvas');x.width=1240;x.height=1754;const g=x.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,1240,1754);g.fillStyle=c.rateioHeaderColor||'#123047';g.fillRect(0,0,1240,130);g.fillStyle='#fff';g.font='bold 34px Arial';g.fillText(c.rateioHeaderName||'Blexo-Rateio',60,82);g.fillStyle='#1e2e38';g.font='bold 30px Arial';g.fillText($('reportTitle').value||'Rateio',60,190);g.font='22px Arial';g.fillText(new Date(($('reportDate').value||today)+'T12:00:00').toLocaleDateString('pt-BR'),60,225);return {x,g,y:285}};let p=make();const widths=[150,170,270,170,330];p.g.font='bold 17px Arial';let x=60;heads.forEach((h,i)=>{p.g.fillText(h,x,p.y);x+=widths[i]});p.y+=38;p.g.font='17px Arial';for(const row of rows){const lineHeight=24;const lines=Math.max(...row.map((v,i)=>wrapText(p.g,v,widths[i]-10).length));const height=Math.max(32,lines*lineHeight+8);if(p.y+height>1630){pages.push(p.x.toDataURL('image/jpeg',.9));p=make();p.g.font='17px Arial'}x=60;row.forEach((v,i)=>{const ls=wrapText(p.g,v,widths[i]-10);ls.forEach((line,j)=>p.g.fillText(line,x,p.y+22+j*lineHeight));x+=widths[i]});p.g.strokeStyle='#d9e0e4';p.g.strokeRect(60,p.y,1090,height);p.y+=height}p.g.font='bold 24px Arial';p.g.fillText(`TOTAL: ${money(total)}`,60,Math.min(p.y+40,1680));pages.push(p.x.toDataURL('image/jpeg',.9));for(const scan of scans)pages.push(await imageToPage(scan.src,'DOCUMENTO DIGITALIZADO'));return pages}
-async function generateRateioPdf(){
- const c=cfg(), entries=type==='tags'?tags:changes;
- if(!entries.length)throw new Error('Adicione pelo menos um lançamento.');
- sortEntries();
- await saveCurrent(false);
- const ordered=asArray(type==='tags'?tags:changes).slice();ordered.sort(compareEntries);
- const heads=type==='tags'?['Bloco','Apartamento','Tipo de Tag','Quantidade','Valor']:['Bloco','Apartamento','Data da mudança','Tipo','Valor'];
- const rows=ordered.map(x=>type==='tags'
-  ? [x.block,x.apartment,x.type==='pedestre'?'Pedestre':'Veículo',x.qty,money(Number(x.qty||0)*(x.type==='pedestre'?c.tagPedestreValue:c.tagVeiculoValue))]
-  : [x.block,x.apartment,new Date(x.date+'T12:00:00').toLocaleDateString('pt-BR'),x.type==='entrada'?'Entrada':'Saída',money(x.type==='entrada'?c.mudancaEntradaValue:c.mudancaSaidaValue)]);
- const total=ordered.reduce((sum,x)=>sum+(type==='tags'?Number(x.qty||0)*(x.type==='pedestre'?Number(c.tagPedestreValue||0):Number(c.tagVeiculoValue||0)):(x.type==='entrada'?Number(c.mudancaEntradaValue||0):Number(c.mudancaSaidaValue||0))),0);
- const name=($('reportTitle').value||'rateio').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()+'.pdf';
- const offline=async()=>{const pages=await rateioOfflinePdf(c,rows,heads,total);window.BlexoOfflinePdf(pages,name);return '✓ PDF gerado com sucesso. Rascunho mantido para edição.'};
- if(!window.jspdf?.jsPDF)return offline();
- try{
-  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'}),color=(c.rateioHeaderColor||'#123047').replace('#','');
-  const rgb=[0,1,2].map(i=>parseInt(color.slice(i*2,i*2+2),16)||0);
-  const widths=[25,32,52,32,40]; let y=0;
-  const drawHeader=()=>{doc.setFillColor(...rgb);doc.rect(0,0,210,22,'F');doc.setTextColor(255,255,255);doc.setFontSize(16);doc.text(c.rateioHeaderName||'Blexo-Rateio',12,14);doc.setTextColor(30,40,48);doc.setFontSize(16);doc.text($('reportTitle').value||'Rateio',12,34);doc.setFontSize(10);doc.text(new Date(($('reportDate').value||today)+'T12:00:00').toLocaleDateString('pt-BR'),12,41);y=50;doc.setFontSize(9);let x=12;heads.forEach((h,i)=>{doc.setFillColor(238,242,245);doc.rect(x,y,widths[i],8,'F');doc.setTextColor(20,30,35);doc.text(h,x+2,y+5);x+=widths[i]});y+=8};
-  drawHeader();
-  for(const row of rows){
-   doc.setFontSize(8.5);
-   const values=row.map(String);
-   const lineSets=values.map((v,i)=>doc.splitTextToSize(v,widths[i]-3));
-   const lineCount=Math.max(...lineSets.map(lines=>lines.length));
-   const rowHeight=Math.max(8,lineCount*4.2+2);
-   if(y+rowHeight>282){doc.addPage();drawHeader();}
-   let x=12;lineSets.forEach((lines,i)=>{doc.setTextColor(30,40,48);doc.text(lines,x+2,y+4.5);doc.rect(x,y,widths[i],rowHeight);x+=widths[i]});
-   y+=rowHeight;
-  }
-  if(y>270){doc.addPage();y=18;}
-  doc.setFontSize(11);doc.setTextColor(20,30,35);doc.text(`TOTAL: ${money(total)}`,12,y+10);y+=20;
-  if(scans.length){
-   if(y>245){doc.addPage();y=18;}
-   doc.setFontSize(14);doc.text('DOCUMENTOS DIGITALIZADOS',12,y);y+=8;
-   for(const scan of scans){
-    if(!scan?.src)continue;
-    const props=doc.getImageProperties(scan.src),ratio=props.width/props.height,w=180,h=Math.min(230,w/ratio);
-    if(y+h>280){doc.addPage();y=18;}
-    doc.addImage(scan.src,'JPEG',15,y,w,h);y+=h+8;
-   }
-  }
-  doc.save(name);
-  return '✓ PDF gerado com sucesso. Rascunho mantido para edição.';
- }catch(error){
-  console.warn('Blexo Rateios: jsPDF falhou, usando gerador local.',error);
-  if(window.BlexoOfflinePdf)return offline();
-  throw error;
- }
-}
-$('generateButton').onclick=async()=>{const button=$('generateButton');button.disabled=true;$('feedback').textContent='Gerando PDF…';try{$('feedback').textContent=await generateRateioPdf()}catch(e){console.error('Blexo Rateios PDF:',e);$('feedback').textContent=`Falha ao gerar PDF: ${e?.message||'erro desconhecido'}`}finally{button.disabled=false}};
+document.addEventListener('click',async e=>{let i=e.target?.dataset?.removeTag;if(i!==undefined){tags.splice(i,1);render();scheduleSave();return}i=e.target?.dataset?.removeChange;if(i!==undefined){changes.splice(i,1);render();scheduleSave();return}i=e.target?.dataset?.removeRefundItem;if(i!==undefined){refundItems.splice(i,1);render();scheduleSave();return}i=e.target?.dataset?.removeRefund;if(i!==undefined){refunds.splice(i,1);render();scheduleSave();return}i=e.target?.dataset?.removeScan;if(i!==undefined){scans.splice(i,1);render();scheduleSave();return}const load=e.target?.dataset?.loadDraft;if(load!==undefined){await loadDraft(load);$('draftsDialog').close();return}const del=e.target?.dataset?.deleteDraft;if(del!==undefined&&confirm('Excluir este rascunho?')){await deleteRecord(del);await renderDrafts();}});
+function fileToData(file,mode='color',level=55){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(r.error);r.onload=()=>{const img=new Image();img.onerror=()=>reject(new Error('Imagem inválida'));img.onload=()=>{let w=img.naturalWidth,h=img.naturalHeight,max=1920;if(Math.max(w,h)>max){const k=max/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.drawImage(img,0,0,w,h);if(mode!=='color'){const d=g.getImageData(0,0,w,h);for(let i=0;i<d.data.length;i+=4){const y=.299*d.data[i]+.587*d.data[i+1]+.114*d.data[i+2];const v=mode==='gray'?Math.max(0,Math.min(255,(y-128)*(1.15+level*.003)+128)):(y<128-(level-50)*.55?0:255);d.data[i]=d.data[i+1]=d.data[i+2]=v}g.putImageData(d,0,0)}resolve({src:c.toDataURL('image/jpeg',.88),mode})};img.src=r.result};r.readAsDataURL(file)})}
+async function loadFiles(files){const mode=document.querySelector('input[name="rateioScanMode"]:checked')?.value||'color',level=Number($('rateioCleanLevel').value);for(const file of files){$('feedback').textContent=type==='ressarcimentos'?'Processando evidência…':'Processando documento…';try{const result=await fileToData(file,mode,level);scans.push({name:file.name||'Evidência',src:result.src,mode:result.mode})}catch(e){console.error(e);alert('Não foi possível processar uma imagem.')}}render();scheduleSave();$('feedback').textContent='✓ Arquivo(s) adicionado(s).'}
+$('cameraInput').addEventListener('change',e=>{loadFiles(e.target.files);e.target.value=''});$('galleryInput').addEventListener('change',e=>{loadFiles(e.target.files);e.target.value=''});$('rateioCleanLevel').addEventListener('input',()=>{$('rateioCleanValue').textContent=`${$('rateioCleanLevel').value}%`;scheduleSave()});document.querySelectorAll('input[name="rateioScanMode"]').forEach(x=>x.addEventListener('change',scheduleSave));
+function rowsForPdf(c){sortEntries();if(type==='tags'){return {heads:['Bloco','Apartamento','Tipo de Tag','Quantidade','Valor'],rows:tags.map(x=>[x.block,x.apartment,x.type==='pedestre'?'Pedestre':'Veículo',x.qty,money(x.qty*(x.type==='pedestre'?c.tagPedestreValue:c.tagVeiculoValue))]),total:tags.reduce((s,x)=>s+x.qty*(x.type==='pedestre'?Number(c.tagPedestreValue||0):Number(c.tagVeiculoValue||0)),0)}}if(type==='mudancas'){return {heads:['Bloco','Apartamento','Data da mudança','Tipo','Valor'],rows:changes.map(x=>[x.block,x.apartment,new Date(x.date+'T12:00:00').toLocaleDateString('pt-BR'),x.type==='entrada'?'Entrada':'Saída',money(x.type==='entrada'?c.mudancaEntradaValue:c.mudancaSaidaValue)]),total:changes.reduce((s,x)=>s+Number(x.type==='entrada'?c.mudancaEntradaValue:c.mudancaSaidaValue),0)}}return {heads:['Bloco','Apartamento','Data da ocorrência','Itens','Valor'],rows:refunds.map(x=>{const total=x.items.reduce((s,y)=>s+Number(y.qty||0)*Number(y.value||0),0);return [x.block,x.apartment,new Date(x.date+'T12:00:00').toLocaleDateString('pt-BR'),x.items.map(y=>`${y.name} × ${y.qty}`).join(' · '),money(total)]}),total:refunds.reduce((s,x)=>s+x.items.reduce((a,y)=>a+Number(y.qty||0)*Number(y.value||0),0),0)}}
+async function generateRateioPdf(){const c=cfg(),entries=type==='tags'?tags:type==='mudancas'?changes:refunds;if(!entries.length)throw new Error('Adicione pelo menos um lançamento.');await saveCurrent(false);const data=rowsForPdf(c);if(!window.jspdf?.jsPDF)throw new Error('Gerador de PDF indisponível. Reabra o aplicativo e tente novamente.');const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4'});const color=(c.rateioHeaderColor||'#123047').replace('#',''),rgb=[0,1,2].map(i=>parseInt(color.slice(i*2,i*2+2),16)||0),widths=[25,30,40,62,33];let y=0;const header=()=>{doc.setFillColor(...rgb);doc.rect(0,0,210,22,'F');doc.setTextColor(255,255,255);doc.setFontSize(16);doc.text(c.rateioHeaderName||'Blexo-Rateio',12,14);doc.setTextColor(30,40,48);doc.setFontSize(16);doc.text($('reportTitle').value||defaultTitle(),12,34);doc.setFontSize(10);doc.text(new Date(($('reportDate').value||today)+'T12:00:00').toLocaleDateString('pt-BR'),12,41);y=50;doc.setFontSize(8.5);let x=12;data.heads.forEach((h,i)=>{doc.setFillColor(238,242,245);doc.rect(x,y,widths[i],8,'F');doc.setTextColor(20,30,35);doc.text(h,x+2,y+5);x+=widths[i]});y+=8};header();for(const row of data.rows){const sets=row.map((v,i)=>doc.splitTextToSize(String(v),widths[i]-3));const lines=Math.max(...sets.map(a=>a.length)),height=Math.max(8,lines*4.2+2);if(y+height>282){doc.addPage();header()}let x=12;sets.forEach((ls,i)=>{doc.setTextColor(30,40,48);doc.text(ls,x+2,y+4.5);doc.rect(x,y,widths[i],height);x+=widths[i]});y+=height}if(y>270){doc.addPage();y=18}doc.setFontSize(11);doc.text(`TOTAL: ${money(data.total)}`,12,y+10);y+=20;if(scans.length){if(y>245){doc.addPage();y=18}doc.setFontSize(14);doc.text(type==='ressarcimentos'?'EVIDÊNCIAS DA OCORRÊNCIA':'DOCUMENTOS DIGITALIZADOS',12,y);y+=8;for(const scan of scans){if(!scan?.src)continue;const props=doc.getImageProperties(scan.src),ratio=props.width/props.height,w=180,h=Math.min(230,w/ratio);if(y+h>280){doc.addPage();y=18}doc.addImage(scan.src,'JPEG',15,y,w,h);y+=h+8}}const name=($('reportTitle').value||'rateio').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase()+'.pdf';doc.save(name);return '✓ PDF gerado com sucesso. Rascunho mantido para edição.'}
+$('generateButton').onclick=async()=>{const b=$('generateButton');b.disabled=true;$('feedback').textContent='Gerando PDF…';try{$('feedback').textContent=await generateRateioPdf()}catch(e){console.error(e);$('feedback').textContent=`Falha ao gerar PDF: ${e?.message||'erro desconhecido'}`}finally{b.disabled=false}};
 window.addEventListener('online',()=>$('offlineStatus').textContent='● Online');window.addEventListener('offline',()=>$('offlineStatus').textContent='● Offline');
-(async()=>{const all=asArray(await getAllRecords());all.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));const last=all[0];if(last)await loadDraft(last.id);else resetDraft('tags')})().catch(e=>{console.error(e);resetDraft('tags')});
+(async()=>{const all=await getAllRecords();all.sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));if(all[0])await loadDraft(all[0].id);else resetDraft('tags')})().catch(e=>{console.error(e);resetDraft('tags')});

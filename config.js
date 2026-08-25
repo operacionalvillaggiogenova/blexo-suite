@@ -26,6 +26,10 @@ const BLEXO_DEFAULT_CONFIG = {
   tagVeiculoValue: 30,
   mudancaEntradaValue: 180,
   mudancaSaidaValue: 180,
+  ressarcimentoItems: [
+    {name:'Controle remoto', value:50},
+    {name:'Chave', value:20}
+  ],
   checkHeaderName: 'Blexo-Check',
   leituristaHeaderName: 'Blexo-Leiturista',
   scannerHeaderName: 'Blexo-Scanner',
