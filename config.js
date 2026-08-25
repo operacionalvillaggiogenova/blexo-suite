@@ -1,14 +1,42 @@
+// ==========================================
+// BLEXO - CONTROLE DE CONFIGURAÇÃO E VERSÃO
+// ==========================================
+
+// IMPORTANTE:
+// Ao alterar esta versão, todas as configurações
+// locais antigas serão substituídas pelos padrões
+// definidos abaixo.
+const BLEXO_APP_VERSION = '48.1';
+
+// Chave que registra qual versão já foi aplicada
+const BLEXO_VERSION_KEY = 'blexo-app-version';
+
+// Chave das configurações do sistema
 const BLEXO_CONFIG_KEY = 'blexo-unificado-config-v2';
+
+
+// ==========================================
+// CONFIGURAÇÕES PADRÃO
+// ==========================================
 
 const BLEXO_DEFAULT_CONFIG = {
   watermark: true,
+
+  // Modelos de fotos
   photoTemplate: 'four',
   checkPhotoTemplate: 'four',
   leituristaPhotoTemplate: 'two',
   orcamentosPhotoTemplate: 'two',
 
-  sealConfig: 'Antes|texto|#123047\nDepois|texto|#176d9a\nVerde|bolinha|#36a269\nAmarelo|bolinha|#e5b22e\nVermelho|bolinha|#cb4c4c',
+  // Selos da Checagem
+  sealConfig:
+    'Antes|texto|#123047\n' +
+    'Depois|texto|#176d9a\n' +
+    'Verde|bolinha|#36a269\n' +
+    'Amarelo|bolinha|#e5b22e\n' +
+    'Vermelho|bolinha|#cb4c4c',
 
+  // Estrutura do condomínio
   blockCount: 26,
 
   commonAreas: [
@@ -18,6 +46,7 @@ const BLEXO_DEFAULT_CONFIG = {
     'Sanepar'
   ],
 
+  // Áreas da Ronda
   rondaAreas: [
     'Salão 1',
     'Salão 2',
@@ -30,28 +59,21 @@ const BLEXO_DEFAULT_CONFIG = {
     'Portão dos Fundos'
   ],
 
+  // Cabeçalho Ronda
   rondaHeaderColor: '#123047',
   rondaHeaderName: 'Ronda',
 
+  // Rateios
   enableGas: true,
   enableWater: true,
 
-  checkHeaderColor: '#123047',
-  leituristaHeaderColor: '#123047',
-  scannerHeaderColor: '#123047',
-  rateioHeaderColor: '#123047',
-  orcamentosHeaderColor: '#123047',
-  reembolsoHeaderColor: '#123047',
+  tagPedestreValue: 15,
+  tagVeiculoValue: 30,
 
-  orcamentosHeaderName: 'Orçamento',
-  reembolsoHeaderName: 'Reembolso',
-  rateioHeaderName: 'Rateio',
-
-  tagPedestreValue: 10,
-  tagVeiculoValue: 20,
   mudancaEntradaValue: 180,
   mudancaSaidaValue: 180,
 
+  // Itens de ressarcimento
   ressarcimentoItems: [
     { name: 'Copo', value: 10 },
     { name: 'Prato', value: 20 },
@@ -59,62 +81,149 @@ const BLEXO_DEFAULT_CONFIG = {
     { name: 'Outros', value: 1 }
   ],
 
+  // Cores dos cabeçalhos
+  checkHeaderColor: '#123047',
+  leituristaHeaderColor: '#123047',
+  scannerHeaderColor: '#123047',
+  rateioHeaderColor: '#123047',
+  orcamentosHeaderColor: '#123047',
+  reembolsoHeaderColor: '#123047',
+
+  // Nomes dos módulos
   checkHeaderName: 'Check',
   leituristaHeaderName: 'Leiturista',
   scannerHeaderName: 'Scanner',
+  rateioHeaderName: 'Rateio',
+  orcamentosHeaderName: 'Orçamento',
+  reembolsoHeaderName: 'Reembolso',
 
+  // Ícones dos módulos
   checkHeaderIcon: '✓',
   leituristaHeaderIcon: 'L',
   scannerHeaderIcon: 'S'
 };
 
-function blexoConfig() {
+
+// ==========================================
+// CÓPIA SEGURA DAS CONFIGURAÇÕES
+// ==========================================
+
+function cloneBlexoConfig(config) {
+  return JSON.parse(JSON.stringify(config));
+}
+
+
+// ==========================================
+// APLICA / FORÇA NOVA VERSÃO
+// ==========================================
+
+function aplicarVersaoBlexo() {
   try {
-    const raw = localStorage.getItem(BLEXO_CONFIG_KEY);
-    const saved = raw ? JSON.parse(raw) : {};
+    const versaoSalva = localStorage.getItem(BLEXO_VERSION_KEY);
 
-    const merged = {
-      ...BLEXO_DEFAULT_CONFIG,
-      ...(saved && typeof saved === 'object' ? saved : {})
-    };
+    // Se a versão publicada mudou, limpa SOMENTE
+    // as configurações e aplica os novos padrões.
+    if (versaoSalva !== BLEXO_APP_VERSION) {
 
-    // Protege listas que devem existir
-    if (!Array.isArray(merged.commonAreas) || merged.commonAreas.length === 0) {
-      merged.commonAreas = [...BLEXO_DEFAULT_CONFIG.commonAreas];
+      console.log(
+        `[BLEXO] Atualizando configurações: ` +
+        `${versaoSalva || 'sem versão'} → ${BLEXO_APP_VERSION}`
+      );
+
+      // Remove configuração antiga
+      localStorage.removeItem(BLEXO_CONFIG_KEY);
+
+      // Salva uma cópia limpa dos padrões atuais
+      localStorage.setItem(
+        BLEXO_CONFIG_KEY,
+        JSON.stringify(cloneBlexoConfig(BLEXO_DEFAULT_CONFIG))
+      );
+
+      // Marca esta versão como aplicada
+      localStorage.setItem(
+        BLEXO_VERSION_KEY,
+        BLEXO_APP_VERSION
+      );
     }
-
-    if (!Array.isArray(merged.rondaAreas) || merged.rondaAreas.length === 0) {
-      merged.rondaAreas = [...BLEXO_DEFAULT_CONFIG.rondaAreas];
-    }
-
-    if (
-      !Array.isArray(merged.ressarcimentoItems) ||
-      merged.ressarcimentoItems.length === 0
-    ) {
-      merged.ressarcimentoItems =
-        BLEXO_DEFAULT_CONFIG.ressarcimentoItems.map(item => ({...item}));
-    }
-
-    return merged;
 
   } catch (error) {
-    console.error('Erro ao carregar configurações do Blexo:', error);
-    return {
-      ...BLEXO_DEFAULT_CONFIG,
-      commonAreas: [...BLEXO_DEFAULT_CONFIG.commonAreas],
-      rondaAreas: [...BLEXO_DEFAULT_CONFIG.rondaAreas],
-      ressarcimentoItems:
-        BLEXO_DEFAULT_CONFIG.ressarcimentoItems.map(item => ({...item}))
-    };
+    console.error(
+      '[BLEXO] Erro ao aplicar versão das configurações:',
+      error
+    );
   }
 }
 
+
+// ==========================================
+// EXECUTA ANTES DE QUALQUER LEITURA
+// ==========================================
+
+aplicarVersaoBlexo();
+
+
+// ==========================================
+// CARREGA CONFIGURAÇÕES
+// ==========================================
+
+function blexoConfig() {
+  try {
+    const raw = localStorage.getItem(BLEXO_CONFIG_KEY);
+
+    // Se não existir configuração, cria com padrão
+    if (!raw) {
+      const defaults = cloneBlexoConfig(BLEXO_DEFAULT_CONFIG);
+
+      localStorage.setItem(
+        BLEXO_CONFIG_KEY,
+        JSON.stringify(defaults)
+      );
+
+      return defaults;
+    }
+
+    const saved = JSON.parse(raw);
+
+    // Proteção contra dados inválidos
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) {
+      throw new Error('Configuração local inválida');
+    }
+
+    return {
+      ...cloneBlexoConfig(BLEXO_DEFAULT_CONFIG),
+      ...saved
+    };
+
+  } catch (error) {
+
+    console.error(
+      '[BLEXO] Erro ao carregar configurações. Restaurando padrão:',
+      error
+    );
+
+    const defaults = cloneBlexoConfig(BLEXO_DEFAULT_CONFIG);
+
+    localStorage.setItem(
+      BLEXO_CONFIG_KEY,
+      JSON.stringify(defaults)
+    );
+
+    return defaults;
+  }
+}
+
+
+// ==========================================
+// SALVA CONFIGURAÇÕES
+// ==========================================
+
 function saveBlexoConfig(config) {
-  const current = blexoConfig();
+
+  const atual = blexoConfig();
 
   const merged = {
-    ...BLEXO_DEFAULT_CONFIG,
-    ...current,
+    ...cloneBlexoConfig(BLEXO_DEFAULT_CONFIG),
+    ...atual,
     ...(config || {})
   };
 
@@ -126,19 +235,25 @@ function saveBlexoConfig(config) {
   return merged;
 }
 
+
+// ==========================================
+// RESTAURA PADRÕES MANUALMENTE
+// ==========================================
+
 function resetBlexoConfig() {
-  const config = {
-    ...BLEXO_DEFAULT_CONFIG,
-    commonAreas: [...BLEXO_DEFAULT_CONFIG.commonAreas],
-    rondaAreas: [...BLEXO_DEFAULT_CONFIG.rondaAreas],
-    ressarcimentoItems:
-      BLEXO_DEFAULT_CONFIG.ressarcimentoItems.map(item => ({...item}))
-  };
+
+  const defaults = cloneBlexoConfig(BLEXO_DEFAULT_CONFIG);
 
   localStorage.setItem(
     BLEXO_CONFIG_KEY,
-    JSON.stringify(config)
+    JSON.stringify(defaults)
   );
 
-  return config;
+  // Mantém a versão atual marcada
+  localStorage.setItem(
+    BLEXO_VERSION_KEY,
+    BLEXO_APP_VERSION
+  );
+
+  return defaults;
 }
