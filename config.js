@@ -47,8 +47,8 @@ const BLEXO_DEFAULT_CONFIG = {
   reembolsoHeaderName: 'Reembolso',
   rateioHeaderName: 'Rateio',
 
-  tagPedestreValue: 15,
-  tagVeiculoValue: 30,
+  tagPedestreValue: 10,
+  tagVeiculoValue: 20,
   mudancaEntradaValue: 180,
   mudancaSaidaValue: 180,
 
