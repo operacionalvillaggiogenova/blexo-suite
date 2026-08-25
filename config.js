@@ -27,8 +27,10 @@ const BLEXO_DEFAULT_CONFIG = {
   mudancaEntradaValue: 180,
   mudancaSaidaValue: 180,
   ressarcimentoItems: [
-    {name:'Controle remoto', value:50},
-    {name:'Chave', value:20}
+    {name:'Copo', value:10},
+    {name:'Prato', value:20}
+    {name:'Talher', value:5}
+    {name:'Outros', value:1}
   ],
   checkHeaderName: 'Blexo-Check',
   leituristaHeaderName: 'Blexo-Leiturista',
