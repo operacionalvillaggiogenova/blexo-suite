@@ -28,8 +28,8 @@ const BLEXO_DEFAULT_CONFIG = {
   mudancaSaidaValue: 180,
   ressarcimentoItems: [
     {name:'Copo', value:10},
-    {name:'Prato', value:20}
-    {name:'Talher', value:5}
+    {name:'Prato', value:20},
+    {name:'Talher', value:5},
     {name:'Outros', value:1}
   ],
   checkHeaderName: 'Blexo-Check',
