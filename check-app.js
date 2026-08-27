@@ -41,6 +41,23 @@ function renderBlocks() {
   document.querySelectorAll('[data-seal]').forEach(field => field.onchange = event => { const [groupId, photoId] = event.target.dataset.seal.split(':'); findGroup(groupId).photos.find(photo => photo.id === photoId).seal = event.target.value; scheduleSave(); });
 }
 
+
+$('addBlockButton').onclick = async () => {
+  try {
+    await saveNow();
+    const block = newBlock();
+    currentReport.groups.push(block);
+    renderBlocks();
+    await saveNow();
+    $('feedback').textContent = '✓ Novo bloco de evidências adicionado e salvo neste aparelho.';
+    const field = document.querySelector(`.group-title[data-group="${block.id}"]`);
+    field?.focus();
+  } catch (error) {
+    console.error('Blexo Check: falha ao adicionar bloco.', error);
+    $('feedback').textContent = `Não foi possível adicionar o bloco: ${error?.message || 'erro desconhecido'}`;
+  }
+};
+
 function exifDateText(file) { return file.arrayBuffer().then(buffer => { const view = new DataView(buffer); if (view.byteLength < 14 || view.getUint16(0, false) !== 0xffd8) return null; let offset = 2; while (offset + 4 < view.byteLength) { if (view.getUint8(offset) !== 0xff) { offset++; continue; } const marker = view.getUint8(offset + 1), length = view.getUint16(offset + 2, false); if (marker === 0xe1 && offset + 10 < view.byteLength && String.fromCharCode(...new Uint8Array(buffer, offset + 4, 4)) === 'Exif') { const tiff = offset + 10, endian = view.getUint16(tiff, false), little = endian === 0x4949; if (!(little || endian === 0x4d4d) || view.getUint16(tiff + 2, little) !== 42) return null; const read16 = pos => view.getUint16(pos, little), read32 = pos => view.getUint32(pos, little); const readIfd = pos => { if (pos < tiff || pos + 2 > view.byteLength) return []; const count = read16(pos), entries = []; for (let i = 0; i < count; i++) { const entry = pos + 2 + i * 12; if (entry + 12 > view.byteLength) break; entries.push({ tag: read16(entry), type: read16(entry + 2), count: read32(entry + 4), value: entry + 8 }); } return entries; }; const ascii = entry => { if (!entry || entry.type !== 2) return null; const pos = entry.count <= 4 ? entry.value : tiff + read32(entry.value); if (pos + entry.count > view.byteLength) return null; return new TextDecoder('ascii').decode(new Uint8Array(buffer, pos, entry.count)).replace(/\0/g, '').trim(); }; const ifd0 = readIfd(tiff + read32(tiff + 4)); const exifPointer = ifd0.find(entry => entry.tag === 0x8769); const exifIfd = exifPointer ? readIfd(tiff + read32(exifPointer.value)) : []; const raw = ascii(exifIfd.find(entry => entry.tag === 0x9003)) || ascii(exifIfd.find(entry => entry.tag === 0x9004)); const match = raw?.match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2})(?::\d{2})?$/); return match ? `${match[3]}/${match[2]}/${match[1]} ${match[4]}:${match[5]}` : null; } if (length < 2) break; offset += 2 + length; } return null; }).catch(() => null); }
 function drawWatermark(image, text) {
   // normalizePhoto() devolve um HTMLCanvasElement. Canvas não tem naturalWidth/naturalHeight.
